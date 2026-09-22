@@ -1,14 +1,18 @@
-# Welcome to your Lovable project
+# Signal Watcher
+
+ဒါကို hosting ပေးပြီးသုံးရအာင်လုပ်ပါ ပြီးတော့ ပြင်ချင်တာရှိပါတယ် results မထွက် သေးပဲ signals သစ်ရပြီ win loss ကြိုပြနေပါတယ် တကယ့် results ထွက်ရင် win loss ပြန်ပြောင်းပါတယ်အဲ့တာကိုပြင်ပေးပါ pending ဖြစ်နေရမှာပါ pending ကိုကာလာ ခရမ်းသုံးပါမယ်န်တာဘာမှမပြင်ပါနဲ့
 
 This project was built with [Lovable](https://lovable.dev).
 
+**Live app**: https://win-loss-predictor-magic.lovable.app
+
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/651129c3-17bd-44cf-bd9f-135d384eb723).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +24,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
