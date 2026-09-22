@@ -63,6 +63,8 @@
   --color-gold-soft: var(--gold-soft);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-pending: var(--pending);
+  --color-pending-foreground: var(--pending-foreground);
   --font-display: "Chakra Petch", system-ui, sans-serif;
   --font-body: "Padauk", system-ui, sans-serif;
 }
