@@ -81,7 +81,16 @@ export function SignalsPanel() {
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const outcome = actual == null ? null : actual === signal.direction ? "WIN" : "LOSS";
-    return { ...signal, num, outcome };
+    // The channel posts only the short tail (for example TRX 91). Rebuild the
+    // full transaction number from the result feed: the matched issue when the
+    // round has settled, otherwise the current day's prefix plus the tail.
+    const latestIssue = results[0]?.issueNumber;
+    const fullPeriod =
+      matched?.issueNumber ??
+      (latestIssue && latestIssue.length > signal.period.length
+        ? latestIssue.slice(0, latestIssue.length - signal.period.length) + signal.period
+        : signal.period);
+    return { ...signal, num, outcome, fullPeriod };
   });
 
   // Win chance: starts at 50%, rises with how strongly the last 10 results
@@ -118,9 +127,9 @@ export function SignalsPanel() {
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="font-display text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                Period
+                Transaction no
               </p>
-               <p className="truncate font-display text-base font-bold tabular-nums">{latest.period}</p>
+               <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
                <p className="mt-1 text-[11px] font-bold text-emerald-400">
                  Win chance: {latest.winChance}%
                </p>
@@ -140,7 +149,7 @@ export function SignalsPanel() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-primary text-primary-foreground">
-              <th className="px-2 py-3 text-left font-display font-bold">Period</th>
+              <th className="px-2 py-3 text-left font-display font-bold">Transaction no</th>
                <th className="px-2 py-3 text-center font-display font-bold">Win chance</th>
               <th className="px-2 py-3 text-center font-display font-bold">Signal</th>
               <th className="px-2 py-3 text-right font-display font-bold">Result</th>
@@ -156,7 +165,7 @@ export function SignalsPanel() {
             )}
               {displayRows.map((r) => (
                <tr key={r.signalId} className="border-t border-border bg-surface">
-                <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.period}</td>
+                <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
                    {r.winChance}%
                 </td>
