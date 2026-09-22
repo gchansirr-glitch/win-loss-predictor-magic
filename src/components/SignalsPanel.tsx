@@ -53,15 +53,24 @@ export function SignalsPanel() {
   // website's inverted direction. Do not recalculate it from client results:
   // that was the source of different signals for different visitors.
   const rows = signals.map((signal) => {
-    // Prefer an exact period match. Formula 1 currently publishes short
-    // periods (for example TRX 64) while the result feed publishes its full
-    // issue number, so fall back to the closest result after the Telegram
-    // post time. The same stored snapshots make this mapping identical for
-    // every visitor.
+    // A signal stays PENDING until the result for its own period is published.
+    // Exact issue-number match is the only fully safe match.
     const exact = results.find((result) => result.issueNumber === signal.period);
     // Formula 1 publishes a short period (for example TRX 94) while the result
-    // feed publishes the full issue number (…794), so match on the tail.
-    const tail = results.find((result) => result.issueNumber.endsWith(signal.period));
+    // feed publishes the full issue number (…794), so a tail match is allowed —
+    // but only when that draw happened AFTER the signal was posted. Without this
+    // check an older round with the same ending settled the signal instantly and
+    // showed WIN/LOSS before the real result existed.
+    const postedMs = signal.postedAt ? Date.parse(signal.postedAt) : null;
+    const tail =
+      postedMs == null
+        ? undefined
+        : results.find(
+            (result) =>
+              result.issueNumber !== signal.period &&
+              result.issueNumber.endsWith(signal.period) &&
+              drawMs(result.blockTimestamp) >= postedMs,
+          );
     const matched = exact ?? tail;
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
