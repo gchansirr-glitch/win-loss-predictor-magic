@@ -175,7 +175,9 @@ export function SignalsPanel() {
                     className={`inline-block rounded-md px-2 py-1 font-display text-[11px] font-bold ${
                       r.outcome === "WIN"
                         ? "bg-emerald-500 text-background"
-                        : "bg-primary text-primary-foreground"
+                        : r.outcome === "LOSS"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-pending text-pending-foreground"
                     }`}
                   >
                      {r.outcome ?? "PENDING"} {r.num ? `(${r.num})` : ""}
