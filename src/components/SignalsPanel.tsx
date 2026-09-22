@@ -19,6 +19,12 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
+// The result feed sends seconds or milliseconds depending on the round.
+function drawMs(blockTimestamp: number): number {
+  const ts = Number(blockTimestamp) || 0;
+  return ts > 1e12 ? ts : ts * 1000;
+}
+
 export function SignalsPanel() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
