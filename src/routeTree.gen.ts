@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicResultsRouteImport } from './routes/api/public/results'
+import { Route as ApiPublicSignalsRouteImport } from './routes/api/public/signals'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicResultsRoute = ApiPublicResultsRouteImport.update({
+  id: '/api/public/results',
+  path: '/api/public/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSignalsRoute = ApiPublicSignalsRouteImport.update({
+  id: '/api/public/signals',
+  path: '/api/public/signals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/results': typeof ApiPublicResultsRoute
+  '/api/public/signals': typeof ApiPublicSignalsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/results': typeof ApiPublicResultsRoute
+  '/api/public/signals': typeof ApiPublicSignalsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/results': typeof ApiPublicResultsRoute
+  '/api/public/signals': typeof ApiPublicSignalsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/public/results' | '/api/public/signals'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/public/results' | '/api/public/signals'
+  id: '__root__' | '/' | '/api/public/results' | '/api/public/signals'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicResultsRoute: typeof ApiPublicResultsRoute
+  ApiPublicSignalsRoute: typeof ApiPublicSignalsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/results': {
+      id: '/api/public/results'
+      path: '/api/public/results'
+      fullPath: '/api/public/results'
+      preLoaderRoute: typeof ApiPublicResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/signals': {
+      id: '/api/public/signals'
+      path: '/api/public/signals'
+      fullPath: '/api/public/signals'
+      preLoaderRoute: typeof ApiPublicSignalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicResultsRoute: ApiPublicResultsRoute,
+  ApiPublicSignalsRoute: ApiPublicSignalsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
