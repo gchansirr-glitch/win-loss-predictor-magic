@@ -156,7 +156,7 @@
                 background-color: var(--color-background);
                     color: var(--color-foreground);
                       }
-                      }
+                    }
 [href*="lovable"],
 a[href*="lovable.dev"] {
   display: none !important;
