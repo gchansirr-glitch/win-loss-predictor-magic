@@ -71,7 +71,8 @@ export function SignalsPanel() {
     const tail = results.find(
       (result) =>
         result.issueNumber !== signal.period &&
-        result.issueNumber.endsWith(signal.period),
+        result.issueNumber.endsWith(signal.period) &&
+        (postedMs == null || drawMs(result.blockTimestamp) >= postedMs),
     );
     const matched = exact ?? tail;
     const num = matched?.number;
