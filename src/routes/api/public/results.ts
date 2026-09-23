@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+const DIRECT_SOURCE =
+  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json";
 const SOURCES = [
-  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json",
+  DIRECT_SOURCE,
+  `https://corsproxy.io/?url=${encodeURIComponent(DIRECT_SOURCE)}`,
+  `https://api.allorigins.win/raw?url=${encodeURIComponent(DIRECT_SOURCE)}`,
 ];
 const TELEGRAM_RESULTS = "https://t.me/s/saytalone_alpha_reverse_trx";
 
@@ -32,10 +36,13 @@ async function fetchResults() {
             accept: "application/json, text/plain, */*",
             "user-agent": REQUEST_HEADERS["user-agent"],
           },
-
+          cache: "no-store",
         });
         lastStatus = res.status;
-        if (res.ok) return res;
+        if (res.ok) {
+          const contentType = res.headers.get("content-type") ?? "";
+          if (contentType.includes("json") || source !== DIRECT_SOURCE) return res;
+        }
       } catch {
         lastStatus = 502;
       }
