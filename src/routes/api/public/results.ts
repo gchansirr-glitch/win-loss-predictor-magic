@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const SOURCE = "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json";
+const SOURCES = [
+  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=100&pageNo=1",
+  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=30&pageNo=1",
+];
 
 type ResultRow = {
   issueNumber: string;
@@ -11,26 +14,60 @@ type ResultRow = {
 
 async function fetchResults() {
   let lastStatus = 502;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const res = await fetch(`${SOURCE}?ts=${Date.now()}&t=${Date.now()}`, {
-        headers: {
-          accept: "application/json, text/plain, */*",
-          "accept-language": "en-US,en;q=0.9",
-          "user-agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          referer: "https://draw.ar-lottery01.com/",
-          origin: "https://draw.ar-lottery01.com",
-        },
-      });
-      lastStatus = res.status;
-      if (res.ok) return res;
-    } catch {
-      lastStatus = 502;
+  for (const source of SOURCES) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const separator = source.includes("?") ? "&" : "?";
+        const res = await fetch(`${source}${separator}ts=${Date.now()}`, {
+          headers: {
+            accept: "application/json, text/plain, */*",
+            "accept-language": "en-US,en;q=0.9",
+            "user-agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            referer: "https://draw.ar-lottery01.com/",
+            origin: "https://draw.ar-lottery01.com",
+          },
+        });
+        lastStatus = res.status;
+        if (res.ok) return res;
+      } catch {
+        lastStatus = 502;
+      }
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, attempt * 400));
     }
-    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 500));
   }
   throw new Error(`upstream ${lastStatus}`);
+}
+
+function normalizeRows(json: unknown): ResultRow[] {
+  const payload = json as {
+    data?: { list?: unknown[]; rows?: unknown[]; records?: unknown[] } | unknown[];
+    list?: unknown[];
+    rows?: unknown[];
+  };
+  const candidates = [
+    Array.isArray(payload?.data) ? payload.data : null,
+    payload?.data && !Array.isArray(payload.data) ? payload.data.list : null,
+    payload?.data && !Array.isArray(payload.data) ? payload.data.rows : null,
+    payload?.data && !Array.isArray(payload.data) ? payload.data.records : null,
+    payload?.list,
+    payload?.rows,
+  ];
+  const rows = candidates.find((value): value is unknown[] => Array.isArray(value)) ?? [];
+  return rows.flatMap((value) => {
+    const row = value as Record<string, unknown>;
+    const issueNumber = row.issueNumber ?? row.issue ?? row.period ?? row.numberIssue;
+    const number = row.number ?? row.result ?? row.winNumber;
+    if (issueNumber == null || number == null) return [];
+    return [
+      {
+        issueNumber: String(issueNumber),
+        number: String(number),
+        color: String(row.color ?? row.colour ?? ""),
+        blockTimestamp: Number(row.blockTimestamp ?? row.blockTime ?? row.timestamp ?? 0),
+      },
+    ];
+  });
 }
 
 export const Route = createFileRoute("/api/public/results")({
@@ -51,7 +88,7 @@ export const Route = createFileRoute("/api/public/results")({
           try {
             const res = await fetchResults();
             const json = await res.json();
-            liveRows = (json?.data?.list ?? []) as ResultRow[];
+            liveRows = normalizeRows(json);
           } catch (upstreamError) {
             console.error("[v0] results upstream unavailable:", String(upstreamError));
           }
@@ -60,17 +97,15 @@ export const Route = createFileRoute("/api/public/results")({
           // change its newest rows while a round is settling, but historical
           // results on the website must remain immutable.
           if (liveRows.length) {
-            const { error: insertError } = await supabase
-              .from("result_snapshots")
-              .upsert(
-                liveRows.map((row) => ({
-                  issue_number: String(row.issueNumber),
-                  number: String(row.number),
-                  color: String(row.color ?? ""),
-                  block_timestamp: Number(row.blockTimestamp ?? 0),
-                })),
-                { onConflict: "issue_number", ignoreDuplicates: true },
-              );
+            const { error: insertError } = await supabase.from("result_snapshots").upsert(
+              liveRows.map((row) => ({
+                issue_number: String(row.issueNumber),
+                number: String(row.number),
+                color: String(row.color ?? ""),
+                block_timestamp: Number(row.blockTimestamp ?? 0),
+              })),
+              { onConflict: "issue_number", ignoreDuplicates: true },
+            );
 
             if (insertError) throw new Error(insertError.message);
           }
