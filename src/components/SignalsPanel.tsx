@@ -63,16 +63,13 @@ export function SignalsPanel() {
     // Exact issue-number match is the only fully safe match.
     const exact = results.find((result) => result.issueNumber === signal.period);
     // Formula 1 publishes a short period (for example TRX 94) while the result
-    // feed publishes the full issue number (…794), so a tail match is allowed —
-    // but only when that draw happened AFTER the signal was posted. Without this
-    // check an older round with the same ending settled the signal instantly and
-    // showed WIN/LOSS before the real result existed.
-    const postedMs = signal.postedAt ? Date.parse(signal.postedAt) : null;
+    // feed publishes the full issue number (…794). Resolve only against the
+    // matching published period; the newest signal remains PENDING until its
+    // period appears in the result feed.
     const tail = results.find(
       (result) =>
         result.issueNumber !== signal.period &&
-        result.issueNumber.endsWith(signal.period) &&
-        (postedMs == null || drawMs(result.blockTimestamp) >= postedMs - 120_000),
+        result.issueNumber.endsWith(signal.period),
     );
     const matched = exact ?? tail;
     const num = matched?.number;
