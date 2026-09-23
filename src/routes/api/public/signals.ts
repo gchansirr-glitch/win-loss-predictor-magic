@@ -35,8 +35,8 @@ function parse(html: string): Signal[] {
     const sourceDirection: Direction =
       rawDirection === "B" || rawDirection === "BIG" ? "BIG" : "SMALL";
 
-    // The website intentionally mirrors the channel in the opposite direction.
-    const direction: Direction = sourceDirection === "BIG" ? "SMALL" : "BIG";
+    // Compare the signal with the actual BIG/SMALL result using the published direction.
+    const direction: Direction = sourceDirection;
     const level = Number(match[3] ?? 1);
     const messageEnd = html.indexOf("</div></div>", m.index);
     const messageHtml = html.slice(m.index, messageEnd === -1 ? undefined : messageEnd);
