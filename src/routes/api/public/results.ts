@@ -18,6 +18,7 @@ type ResultRow = {
   issueNumber: string;
   number: string;
   color: string;
+  size?: "BIG" | "SMALL";
   blockTimestamp: number;
 };
 
@@ -61,12 +62,13 @@ async function fetchTelegramResults(): Promise<ResultRow[]> {
       .replace(/&nbsp;/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    const result = text.match(/\b(\d{8,30})[\s\S]{0,80}?\b(?:BIG|SMALL|B|S)\s*\((\d)\)/i);
+    const result = text.match(/\b(\d{8,30})\s+(BIG|SMALL|B|S)\s*\((\d)\)/i);
     if (!result) continue;
     const time = html.slice(match.index, match.index + 1800).match(/<time\s+datetime="([^"]+)"/i)?.[1];
     rows.push({
       issueNumber: result[1],
-      number: result[2],
+      number: result[3],
+      size: /^(?:BIG|B)$/i.test(result[2]) ? "BIG" : "SMALL",
       color: "",
       blockTimestamp: time ? Math.floor(Date.parse(time.replace(/:\s?(\d{2})\+/, ":$1+")) / 1000) : 0,
     });
@@ -133,6 +135,25 @@ export const Route = createFileRoute("/api/public/results")({
             }
           }
 
+          // The upstream JSON exposes the digit but not always the game's
+          // published BIG/SMALL label. Telegram's result feed is the authority
+          // for that label, so merge it over matching issues whenever available.
+          try {
+            const officialRows = await fetchTelegramResults();
+            const officialByIssue = new Map(officialRows.map((row) => [row.issueNumber, row]));
+            liveRows = liveRows.map((row) => {
+              const official = officialByIssue.get(row.issueNumber);
+              return official
+                ? { ...row, number: official.number, size: official.size, blockTimestamp: official.blockTimestamp || row.blockTimestamp }
+                : row;
+            });
+            for (const official of officialRows) {
+              if (!liveRows.some((row) => row.issueNumber === official.issueNumber)) liveRows.push(official);
+            }
+          } catch (officialError) {
+            console.error("[v0] official result labels unavailable:", String(officialError));
+          }
+
           // Keep the first result received for an issue. The upstream feed can
           // change its newest rows while a round is settling, but historical
           // results on the website must remain immutable.
@@ -158,12 +179,17 @@ export const Route = createFileRoute("/api/public/results")({
 
           if (readError) throw new Error(readError.message);
 
-          const list = (stored ?? []).map((row) => ({
-            issueNumber: row.issue_number,
-            number: row.number,
-            color: row.color,
-            blockTimestamp: Number(row.block_timestamp),
-          }));
+          const liveByIssue = new Map(liveRows.map((row) => [row.issueNumber, row]));
+          const list = (stored ?? []).map((row) => {
+            const live = liveByIssue.get(row.issue_number);
+            return {
+              issueNumber: row.issue_number,
+              number: live?.number ?? row.number,
+              size: live?.size,
+              color: row.color,
+              blockTimestamp: Number(row.block_timestamp),
+            };
+          });
 
           list.sort((a, b) => {
             try {

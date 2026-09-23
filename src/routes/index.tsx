@@ -36,6 +36,7 @@ type Item = {
   issueNumber: string;
   number: string;
   color: string;
+  size?: "BIG" | "SMALL";
   blockTimestamp: number;
 };
 
@@ -267,7 +268,7 @@ function Dashboard({ user }: { user: TgUser }) {
                       )}
                       {list.map((row) => {
                         const n = parseInt(row.number, 10);
-                        const big = n >= 5;
+                        const big = row.size ? row.size === "BIG" : n >= 5;
                         return (
                           <tr key={row.issueNumber} className="border-t border-border bg-surface">
                             <td className="px-3 py-3 font-display tabular-nums">
