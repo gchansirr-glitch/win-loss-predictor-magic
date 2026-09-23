@@ -122,9 +122,30 @@ export const Route = createFileRoute("/api/public/signals")({
 
           if (readError) throw new Error(readError.message);
 
+          const { data: resultRows, error: resultReadError } = await supabase
+            .from("result_snapshots")
+            .select("issue_number")
+            .order("issue_number", { ascending: false })
+            .limit(100);
+
+          if (resultReadError) throw new Error(resultReadError.message);
+
+          const latestIssue = resultRows?.[0]?.issue_number
+            ? String(resultRows[0].issue_number)
+            : null;
+          const normalizePeriod = (period: string) => {
+            const raw = String(period);
+            if (!latestIssue || raw.length >= latestIssue.length) return raw;
+            const prefix = latestIssue.slice(0, latestIssue.length - raw.length);
+            return `${prefix}${raw}`;
+          };
+
           const list = (stored ?? []).map((row) => ({
             signalId: row.signal_id,
-            period: row.period,
+            // Telegram publishes the short round tail. Expand it to the exact
+            // transaction number used by result_snapshots so settlement is an
+            // exact lookup, while an absent row remains PENDING.
+            period: normalizePeriod(String(row.period)),
             sourceDirection: row.source_direction,
             direction: row.website_direction,
             level: row.level,
