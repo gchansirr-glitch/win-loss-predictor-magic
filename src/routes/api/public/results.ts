@@ -4,6 +4,15 @@ const SOURCES = [
   "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=100&pageNo=1",
   "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=30&pageNo=1",
 ];
+const TELEGRAM_RESULTS = "https://t.me/s/saytalone_alpha_reverse_trx";
+
+const REQUEST_HEADERS = {
+  accept: "application/json, text/plain, */*",
+  "accept-language": "en-US,en;q=0.9",
+  "user-agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  referer: "https://vip-six-inky.vercel.app/",
+};
 
 type ResultRow = {
   issueNumber: string;
@@ -20,13 +29,10 @@ async function fetchResults() {
         const separator = source.includes("?") ? "&" : "?";
         const res = await fetch(`${source}${separator}ts=${Date.now()}`, {
           headers: {
-            accept: "application/json, text/plain, */*",
-            "accept-language": "en-US,en;q=0.9",
-            "user-agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            referer: "https://draw.ar-lottery01.com/",
+            ...REQUEST_HEADERS,
             origin: "https://draw.ar-lottery01.com",
           },
+
         });
         lastStatus = res.status;
         if (res.ok) return res;
@@ -37,6 +43,35 @@ async function fetchResults() {
     }
   }
   throw new Error(`upstream ${lastStatus}`);
+}
+
+async function fetchTelegramResults(): Promise<ResultRow[]> {
+  const res = await fetch(`${TELEGRAM_RESULTS}?t=${Date.now()}`, {
+    headers: { ...REQUEST_HEADERS, accept: "text/html" },
+  });
+  if (!res.ok) throw new Error(`telegram upstream ${res.status}`);
+  const html = await res.text();
+  const rows: ResultRow[] = [];
+  const pattern = /message_text[^>]*>([\s\S]*?)<\/div>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html))) {
+    const text = (match[1] ?? "")
+      .replace(/<br\s*\/?\s*>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const result = text.match(/\b(\d{8,30})\s+(?:BIG|SMALL|B|S)\s*\((\d)\)/i);
+    if (!result) continue;
+    const time = html.slice(match.index, match.index + 1800).match(/<time\s+datetime="([^"]+)"/i)?.[1];
+    rows.push({
+      issueNumber: result[1],
+      number: result[2],
+      color: "",
+      blockTimestamp: time ? Math.floor(Date.parse(time.replace(/:\s?(\d{2})\+/, ":$1+")) / 1000) : 0,
+    });
+  }
+  return rows;
 }
 
 function normalizeRows(json: unknown): ResultRow[] {
@@ -57,7 +92,7 @@ function normalizeRows(json: unknown): ResultRow[] {
   return rows.flatMap((value) => {
     const row = value as Record<string, unknown>;
     const issueNumber = row.issueNumber ?? row.issue ?? row.period ?? row.numberIssue;
-    const number = row.number ?? row.result ?? row.winNumber;
+    const number = row.number ?? row.result ?? row.winNumber ?? row.drawNumber;
     if (issueNumber == null || number == null) return [];
     return [
       {
@@ -89,8 +124,13 @@ export const Route = createFileRoute("/api/public/results")({
             const res = await fetchResults();
             const json = await res.json();
             liveRows = normalizeRows(json);
-          } catch (upstreamError) {
+                    } catch (upstreamError) {
             console.error("[v0] results upstream unavailable:", String(upstreamError));
+            try {
+              liveRows = await fetchTelegramResults();
+            } catch (telegramError) {
+              console.error("[v0] Telegram results fallback unavailable:", String(telegramError));
+            }
           }
 
           // Keep the first result received for an issue. The upstream feed can
