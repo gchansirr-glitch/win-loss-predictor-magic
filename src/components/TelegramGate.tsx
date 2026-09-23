@@ -28,30 +28,49 @@ export function TelegramGate({ children }: { children: (user: TgUser) => ReactNo
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    try {
-      tg?.ready();
-      tg?.expand();
-    } catch {
-      /* ignore */
-    }
-    const tgUser = tg?.initDataUnsafe?.user;
-    if (tgUser?.id) {
-      setUser(tgUser);
+    const initializeTelegram = () => {
+      const tg = window.Telegram?.WebApp;
       try {
-        localStorage.setItem(STORE_KEY, JSON.stringify(tgUser));
+        tg?.ready();
+        tg?.expand();
       } catch {
         /* ignore */
       }
-    } else {
-      try {
-        const cached = localStorage.getItem(STORE_KEY);
-        if (cached) setUser(JSON.parse(cached) as TgUser);
-      } catch {
-        /* ignore */
+      const tgUser = tg?.initDataUnsafe?.user;
+      if (tgUser?.id) {
+        setUser(tgUser);
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(tgUser));
+        } catch {
+          /* ignore */
+        }
+      } else {
+        try {
+          const cached = localStorage.getItem(STORE_KEY);
+          if (cached) setUser(JSON.parse(cached) as TgUser);
+        } catch {
+          /* ignore */
+        }
       }
+      setReady(true);
+    };
+
+    if (window.Telegram?.WebApp) {
+      initializeTelegram();
+      return;
     }
-    setReady(true);
+
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-web-app.js";
+    script.async = true;
+    script.onload = initializeTelegram;
+    script.onerror = initializeTelegram;
+    document.head.appendChild(script);
+
+    return () => {
+      script.onload = null;
+      script.onerror = null;
+    };
   }, []);
 
   if (!ready) {
