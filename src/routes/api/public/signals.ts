@@ -42,9 +42,8 @@ function parse(html: string): Signal[] {
     const messageHtml = html.slice(m.index, messageEnd === -1 ? undefined : messageEnd);
     const postedAt = messageHtml.match(/<time\s+datetime="([^"]+)"/i)?.[1] ?? null;
 
-    // Keep the first version seen for a period in this fetch. The database
-    // insert below is ignore-on-conflict, so an old signal can never be edited
-    // by a later Telegram update.
+    // Keep one current snapshot per period in this fetch. Existing rows are
+    // refreshed so corrected BIG/SMALL posts replace stale stored directions.
     if (!out.has(period)) {
       out.set(period, {
         signalId: `${period}:${postedAt ?? text}`,
@@ -92,9 +91,8 @@ export const Route = createFileRoute("/api/public/signals")({
             console.error("[v0] signals upstream unavailable:", String(upstreamError));
           }
 
-          // Insert only new periods. This makes the signal shown to every
-          // visitor deterministic and prevents edited Telegram posts from
-          // rewriting historical website signals.
+          // Upsert current channel snapshots so corrected directions are
+          // reflected for every visitor and old stored values do not persist.
           if (parsed.length) {
             const { error: insertError } = await supabase
               .from("signal_snapshots")
@@ -108,7 +106,7 @@ export const Route = createFileRoute("/api/public/signals")({
                   source_text: signal.sourceText,
                   posted_at: signal.postedAt,
                 })),
-                { onConflict: "signal_id", ignoreDuplicates: true },
+                { onConflict: "signal_id" },
               );
 
             if (insertError) throw new Error(insertError.message);
