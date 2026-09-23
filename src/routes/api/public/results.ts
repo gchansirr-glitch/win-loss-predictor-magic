@@ -144,7 +144,7 @@ export const Route = createFileRoute("/api/public/results")({
                 color: String(row.color ?? ""),
                 block_timestamp: Number(row.blockTimestamp ?? 0),
               })),
-              { onConflict: "issue_number", ignoreDuplicates: true },
+              { onConflict: "issue_number", ignoreDuplicates: false },
             );
 
             if (insertError) throw new Error(insertError.message);

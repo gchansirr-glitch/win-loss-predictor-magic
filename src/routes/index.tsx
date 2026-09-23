@@ -52,14 +52,29 @@ function dotClass(c: string) {
   return "bg-muted-foreground";
 }
 
-function fmtTime(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString("en-GB", { hour12: false });
+function issueDate(issueNumber: string) {
+  const match = issueNumber.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  return new Date(Date.UTC(+year, +month - 1, +day, +hour, +minute));
 }
 
-function fmtDate(ts: number) {
-  const d = new Date(ts);
-  return d.toISOString().slice(0, 10);
+function dateForRow(row: ResultRow) {
+  const timestamp = Number(row.blockTimestamp);
+  if (timestamp > 0) {
+    const ms = timestamp > 1e12 ? timestamp : timestamp * 1000;
+    const date = new Date(ms);
+    if (!Number.isNaN(date.getTime()) && date.getUTCFullYear() > 2000) return date;
+  }
+  return issueDate(row.issueNumber) ?? new Date();
+}
+
+function fmtTime(row: ResultRow) {
+  return dateForRow(row).toLocaleTimeString("en-GB", { hour12: false });
+}
+
+function fmtDate(row: ResultRow) {
+  return dateForRow(row).toISOString().slice(0, 10);
 }
 
 function Index() {
@@ -259,9 +274,9 @@ function Dashboard({ user }: { user: TgUser }) {
                               {row.issueNumber}
                             </td>
                             <td className="px-3 py-3 font-display tabular-nums text-muted-foreground">
-                              <div className="text-foreground">{fmtTime(row.blockTimestamp)}</div>
+                              <div className="text-foreground">{fmtTime(row)}</div>
                               <div className="whitespace-nowrap text-xs">
-                                {fmtDate(row.blockTimestamp)}
+                                {fmtDate(row)}
                               </div>
                             </td>
                             <td className="px-3 py-3 text-center">

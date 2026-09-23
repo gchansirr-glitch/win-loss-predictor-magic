@@ -68,15 +68,12 @@ export function SignalsPanel() {
     // check an older round with the same ending settled the signal instantly and
     // showed WIN/LOSS before the real result existed.
     const postedMs = signal.postedAt ? Date.parse(signal.postedAt) : null;
-    const tail =
-      postedMs == null
-        ? undefined
-        : results.find(
-            (result) =>
-              result.issueNumber !== signal.period &&
-              result.issueNumber.endsWith(signal.period) &&
-              drawMs(result.blockTimestamp) >= postedMs,
-          );
+    const tail = results.find(
+      (result) =>
+        result.issueNumber !== signal.period &&
+        result.issueNumber.endsWith(signal.period) &&
+        (postedMs == null || drawMs(result.blockTimestamp) >= postedMs - 120_000),
+    );
     const matched = exact ?? tail;
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
