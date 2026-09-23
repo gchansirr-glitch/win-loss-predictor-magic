@@ -19,12 +19,6 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
-// The result feed sends seconds or milliseconds depending on the round.
-function drawMs(blockTimestamp: number): number {
-  const ts = Number(blockTimestamp) || 0;
-  return ts > 1e12 ? ts : ts * 1000;
-}
-
 export function SignalsPanel() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -59,19 +53,10 @@ export function SignalsPanel() {
   // website's inverted direction. Do not recalculate it from client results:
   // that was the source of different signals for different visitors.
   const rows = signals.map((signal) => {
-    // A signal stays PENDING until the result for its own period is published.
-    // Exact issue-number match is the only fully safe match.
-    const exact = results.find((result) => result.issueNumber === signal.period);
-    // Formula 1 publishes a short period (for example TRX 94) while the result
-    // feed publishes the full issue number (…794). Resolve only against the
-    // matching published period; the newest signal remains PENDING until its
-    // period appears in the result feed.
-    const tail = results.find(
-      (result) =>
-        result.issueNumber !== signal.period &&
-        result.issueNumber.endsWith(signal.period),
-    );
-    const matched = exact ?? tail;
+    // A signal stays PENDING until its exact transaction/period appears in
+    // the fetched Game History rows. Never settle against a suffix or nearby
+    // round because that can evaluate a signal before its own result exists.
+    const matched = results.find((result) => result.issueNumber === signal.period);
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const outcome = actual == null ? null : actual === signal.direction ? "WIN" : "LOSS";
