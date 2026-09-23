@@ -65,9 +65,11 @@ export const Route = createFileRoute("/api/public/signals")({
     handlers: {
       GET: async () => {
         try {
-          // Public anon client + RLS. Ingestion writes and signal reads both
-          // go through the publishable key — no service_role secret is used.
-          const { supabase } = await import("@/integrations/supabase/client");
+          // Server-only ingestion + reads use the service-role client, which
+          // bypasses RLS. The anon key only has SELECT (and no INSERT) on
+          // signal_snapshots, so writing with it fails the RLS policy. This
+          // route never ships to the client bundle, so the secret stays server-side.
+          const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
 
           // Fetch the Telegram channel, but never let an upstream outage take
           // down the whole endpoint: fall back to the signals already stored.

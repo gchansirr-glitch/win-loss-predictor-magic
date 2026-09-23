@@ -13,10 +13,14 @@ async function fetchResults() {
   let lastStatus = 502;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const res = await fetch(`${SOURCE}?t=${Date.now()}`, {
+      const res = await fetch(`${SOURCE}?ts=${Date.now()}&t=${Date.now()}`, {
         headers: {
-          accept: "application/json",
-          "user-agent": "Mozilla/5.0 DrThetPyinnResults/2.0",
+          accept: "application/json, text/plain, */*",
+          "accept-language": "en-US,en;q=0.9",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          referer: "https://draw.ar-lottery01.com/",
+          origin: "https://draw.ar-lottery01.com",
         },
       });
       lastStatus = res.status;
@@ -34,9 +38,11 @@ export const Route = createFileRoute("/api/public/results")({
     handlers: {
       GET: async () => {
         try {
-          // Public anon client + RLS. Ingestion writes and history reads both
-          // go through the publishable key — no service_role secret is used.
-          const { supabase } = await import("@/integrations/supabase/client");
+          // Server-only ingestion + reads use the service-role client, which
+          // bypasses RLS. The anon key only has SELECT (and no INSERT) on
+          // result_snapshots, so writing with it fails the RLS policy. This
+          // route never ships to the client bundle, so the secret stays server-side.
+          const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
 
           // Fetch the live upstream, but never let an upstream outage take down
           // the whole endpoint. The source WAF blocks some server IPs (403), so
