@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { listUsers, setVip } from "@/lib/vip.functions";
 
 type Row = {
@@ -11,8 +10,6 @@ type Row = {
 };
 
 export function AdminPanel({ adminId }: { adminId: string }) {
-  const fetchUsers = useServerFn(listUsers);
-  const changeVip = useServerFn(setVip);
   const [users, setUsers] = useState<Row[]>([]);
   const [manualId, setManualId] = useState("");
   const [manualDays, setManualDays] = useState("7");
@@ -21,12 +18,12 @@ export function AdminPanel({ adminId }: { adminId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetchUsers({ data: { adminId } });
+      const res = await listUsers(adminId);
       setUsers(res.users as Row[]);
     } catch {
       setMsg("Failed to load users");
     }
-  }, [adminId, fetchUsers]);
+  }, [adminId]);
 
   useEffect(() => {
     void load();
@@ -44,7 +41,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
     }
     setBusy(telegramId + plan);
     try {
-      await changeVip({ data: { adminId, telegramId, plan, days } });
+      await setVip({ adminId, telegramId, plan, days });
       setMsg(
         plan === "revoke"
           ? `Removed VIP for ${telegramId}`

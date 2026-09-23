@@ -65,26 +65,36 @@ export const Route = createFileRoute("/api/public/signals")({
     handlers: {
       GET: async () => {
         try {
-          const res = await fetch(`${CHANNEL}?t=${Date.now()}`, {
-            headers: {
-              accept: "text/html",
-              "user-agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-            },
-          });
-          if (!res.ok) {
-            return Response.json({ error: `upstream ${res.status}` }, { status: 502 });
-          }
-          const html = await res.text();
+          // Public anon client + RLS. Ingestion writes and signal reads both
+          // go through the publishable key — no service_role secret is used.
+          const { supabase } = await import("@/integrations/supabase/client");
 
-          const parsed = parse(html);
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          // Fetch the Telegram channel, but never let an upstream outage take
+          // down the whole endpoint: fall back to the signals already stored.
+          let parsed: Signal[] = [];
+          try {
+            const res = await fetch(`${CHANNEL}?t=${Date.now()}`, {
+              headers: {
+                accept: "text/html",
+                "user-agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+              },
+            });
+            if (res.ok) {
+              const html = await res.text();
+              parsed = parse(html);
+            } else {
+              console.error("[v0] signals upstream status:", res.status);
+            }
+          } catch (upstreamError) {
+            console.error("[v0] signals upstream unavailable:", String(upstreamError));
+          }
 
           // Insert only new periods. This makes the signal shown to every
           // visitor deterministic and prevents edited Telegram posts from
           // rewriting historical website signals.
           if (parsed.length) {
-            const { error: insertError } = await supabaseAdmin
+            const { error: insertError } = await supabase
               .from("signal_snapshots")
               .upsert(
                 parsed.map((signal) => ({
@@ -102,7 +112,7 @@ export const Route = createFileRoute("/api/public/signals")({
             if (insertError) throw new Error(insertError.message);
           }
 
-          const { data: stored, error: readError } = await supabaseAdmin
+          const { data: stored, error: readError } = await supabase
             .from("signal_snapshots")
             .select(
               "signal_id, period, source_direction, website_direction, level, source_text, posted_at, captured_at",
