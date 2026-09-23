@@ -34,10 +34,19 @@ export const Route = createFileRoute("/api/public/results")({
     handlers: {
       GET: async () => {
         try {
-          const res = await fetchResults();
-          const json = await res.json();
-          const liveRows = (json?.data?.list ?? []) as ResultRow[];
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+          // Fetch the live upstream, but never let an upstream outage take down
+          // the whole endpoint. The source WAF blocks some server IPs (403), so
+          // when it is unreachable we still serve the results already stored.
+          let liveRows: ResultRow[] = [];
+          try {
+            const res = await fetchResults();
+            const json = await res.json();
+            liveRows = (json?.data?.list ?? []) as ResultRow[];
+          } catch (upstreamError) {
+            console.error("[v0] results upstream unavailable:", String(upstreamError));
+          }
 
           // Keep the first result received for an issue. The upstream feed can
           // change its newest rows while a round is settling, but historical
