@@ -120,14 +120,47 @@ function Dashboard({ user }: { user: TgUser }) {
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/public/results");
-        const json = await res.json();
+        const live = await fetch(
+          `https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?t=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        if (!live.ok) throw new Error(`live feed ${live.status}`);
+        const json = await live.json();
+        const sourceRows = Array.isArray(json?.data?.list)
+          ? json.data.list
+          : Array.isArray(json?.data)
+            ? json.data
+            : [];
+        const rows: Item[] = sourceRows
+          .map((row: Record<string, unknown>) => {
+            const issueNumber = row.issue ?? row.issueNumber ?? row.period;
+            const rawNumber = row.result ?? row.number ?? row.winNumber;
+            if (issueNumber == null || rawNumber == null) return null;
+            const number = String(rawNumber);
+            return {
+              issueNumber: String(issueNumber),
+              number,
+              size: Number(number) >= 5 ? "BIG" : "SMALL",
+              color: String(row.color ?? ""),
+              blockTimestamp: Number(row.blockTimestamp ?? row.timestamp ?? 0),
+            } satisfies Item;
+          })
+          .filter((row): row is Item => row !== null)
+          .sort((a, b) => Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)));
         if (!alive) return;
-        const rows: Item[] = json?.data?.list ?? [];
         setList(rows);
         setError(rows.length ? null : "No data");
       } catch {
-        if (alive) setError("Connection failed");
+        try {
+          const res = await fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" });
+          const json = await res.json();
+          if (!alive) return;
+          const rows: Item[] = json?.data?.list ?? [];
+          setList(rows);
+          setError(rows.length ? null : "No data");
+        } catch {
+          if (alive) setError("Connection failed");
+        }
       }
     };
     load();
