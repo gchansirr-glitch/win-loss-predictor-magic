@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/public/results")({
     handlers: {
       GET: async () => {
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          // Public anon client + RLS. Ingestion writes and history reads both
+          // go through the publishable key — no service_role secret is used.
+          const { supabase } = await import("@/integrations/supabase/client");
 
           // Fetch the live upstream, but never let an upstream outage take down
           // the whole endpoint. The source WAF blocks some server IPs (403), so
@@ -52,7 +54,7 @@ export const Route = createFileRoute("/api/public/results")({
           // change its newest rows while a round is settling, but historical
           // results on the website must remain immutable.
           if (liveRows.length) {
-            const { error: insertError } = await supabaseAdmin
+            const { error: insertError } = await supabase
               .from("result_snapshots")
               .upsert(
                 liveRows.map((row) => ({
@@ -67,7 +69,7 @@ export const Route = createFileRoute("/api/public/results")({
             if (insertError) throw new Error(insertError.message);
           }
 
-          const { data: stored, error: readError } = await supabaseAdmin
+          const { data: stored, error: readError } = await supabase
             .from("result_snapshots")
             .select("issue_number, number, color, block_timestamp")
             .order("issue_number", { ascending: false })

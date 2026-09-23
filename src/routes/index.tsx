@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { TelegramGate, type TgUser } from "@/components/TelegramGate";
 import { SignalsPanel } from "@/components/SignalsPanel";
 import { AdminPanel } from "@/components/AdminPanel";
@@ -68,7 +67,6 @@ function Index() {
 }
 
 function Dashboard({ user }: { user: TgUser }) {
-  const sync = useServerFn(syncUser);
   const [list, setList] = useState<Item[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
@@ -83,13 +81,11 @@ function Dashboard({ user }: { user: TgUser }) {
     let alive = true;
     const check = async () => {
       try {
-        const res = await sync({
-          data: {
-            telegramId: String(user.id),
-            username: user.username ?? null,
-            firstName: user.first_name ?? null,
-            photoUrl: user.photo_url ?? null,
-          },
+        const res = await syncUser({
+          telegramId: String(user.id),
+          username: user.username ?? null,
+          firstName: user.first_name ?? null,
+          photoUrl: user.photo_url ?? null,
         });
         if (alive) setAccess(res);
       } catch {
@@ -102,7 +98,7 @@ function Dashboard({ user }: { user: TgUser }) {
       alive = false;
       clearInterval(id);
     };
-  }, [sync, user]);
+  }, [user]);
 
   useEffect(() => {
     let alive = true;

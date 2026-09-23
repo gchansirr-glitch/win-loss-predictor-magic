@@ -65,7 +65,9 @@ export const Route = createFileRoute("/api/public/signals")({
     handlers: {
       GET: async () => {
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          // Public anon client + RLS. Ingestion writes and signal reads both
+          // go through the publishable key — no service_role secret is used.
+          const { supabase } = await import("@/integrations/supabase/client");
 
           // Fetch the Telegram channel, but never let an upstream outage take
           // down the whole endpoint: fall back to the signals already stored.
@@ -92,7 +94,7 @@ export const Route = createFileRoute("/api/public/signals")({
           // visitor deterministic and prevents edited Telegram posts from
           // rewriting historical website signals.
           if (parsed.length) {
-            const { error: insertError } = await supabaseAdmin
+            const { error: insertError } = await supabase
               .from("signal_snapshots")
               .upsert(
                 parsed.map((signal) => ({
@@ -110,7 +112,7 @@ export const Route = createFileRoute("/api/public/signals")({
             if (insertError) throw new Error(insertError.message);
           }
 
-          const { data: stored, error: readError } = await supabaseAdmin
+          const { data: stored, error: readError } = await supabase
             .from("signal_snapshots")
             .select(
               "signal_id, period, source_direction, website_direction, level, source_text, posted_at, captured_at",
