@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const SOURCES = [
-  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=100&pageNo=1",
-  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=30&pageNo=1",
+  "https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json",
 ];
 const TELEGRAM_RESULTS = "https://t.me/s/saytalone_alpha_reverse_trx";
 
@@ -28,10 +27,10 @@ async function fetchResults() {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         const separator = source.includes("?") ? "&" : "?";
-        const res = await fetch(`${source}${separator}ts=${Date.now()}`, {
+        const res = await fetch(`${source}${separator}pageSize=100&pageNo=1&ts=${Date.now()}`, {
           headers: {
-            ...REQUEST_HEADERS,
-            origin: "https://draw.ar-lottery01.com",
+            accept: "application/json, text/plain, */*",
+            "user-agent": REQUEST_HEADERS["user-agent"],
           },
 
         });
