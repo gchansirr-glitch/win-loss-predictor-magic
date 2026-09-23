@@ -93,8 +93,8 @@ function normalizeRows(json: unknown): ResultRow[] {
   const rows = candidates.find((value): value is unknown[] => Array.isArray(value)) ?? [];
   return rows.flatMap((value) => {
     const row = value as Record<string, unknown>;
-    const issueNumber = row.issueNumber ?? row.issue ?? row.period ?? row.numberIssue;
-    const number = row.number ?? row.result ?? row.winNumber ?? row.drawNumber;
+    const issueNumber = row.issue ?? row.issueNumber ?? row.period ?? row.numberIssue;
+    const number = row.result ?? row.number ?? row.winNumber ?? row.drawNumber;
     if (issueNumber == null || number == null) return [];
     return [
       {
