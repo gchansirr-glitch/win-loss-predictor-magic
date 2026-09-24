@@ -113,19 +113,20 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     };
   }, []);
 
+  const sanitizeNo = (value: unknown) => String(value ?? "").trim().replace(/\D/g, "");
+
   const rows = signals.map((signal, index) => {
-    // Signals may carry the short round suffix while Game History carries the
-    // full transaction number. Resolve the suffix only when it identifies one
-    // fetched history row; otherwise keep the signal PENDING.
-    const exact = results.find((result) => result.issueNumber === signal.period);
-    const suffixMatches = exact
-      ? []
-      : results.filter((result) => result.issueNumber.endsWith(signal.period));
-    const matched = exact ?? (suffixMatches.length === 1 ? suffixMatches[0] : undefined);
+    const signalNo = sanitizeNo(signal.period);
+    const matched = results.find((result) => {
+      const historyNo = sanitizeNo(result.issueNumber);
+      return Boolean(signalNo && historyNo) && (
+        historyNo === signalNo || historyNo.endsWith(signalNo) || signalNo.endsWith(historyNo)
+      );
+    });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const prediction = String(signal.direction ?? "").toUpperCase();
-    const outcome = !matched || (index === 0 && !num)
+    const outcome = !matched || num == null || num === ""
       ? "PENDING"
       : actual === prediction
         ? "WIN"
