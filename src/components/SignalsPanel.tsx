@@ -44,38 +44,39 @@ export function SignalsPanel() {
 
     const load = async () => {
       const [signalsResponse, historyResponse] = await Promise.allSettled([
-        withTimeout(supabase.from("signals").select("*").order("created_at", { ascending: false }).limit(100)),
-        withTimeout(supabase.from("game_history").select("*").limit(50)),
+        withTimeout(supabase.from("signals").select("*").order("created_at", { ascending: false }).limit(20)),
+        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(50)),
       ]);
       if (!alive) return;
 
-      const signalRows = signalsResponse.status === "fulfilled" && !signalsResponse.value.error
-        ? signalsResponse.value.data ?? []
-        : [];
-      const list: Signal[] = signalRows.map((row: Record<string, unknown>, index: number) => {
-        const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
-        return {
-          signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
-          period: String(row.transaction_no ?? row.period ?? row.transaction_number ?? ""),
-          sourceDirection: String(row.source_direction ?? direction).toUpperCase() as Direction,
-          direction: (direction === "BIG" ? "BIG" : "SMALL") as Direction,
-          level: Number(row.level ?? row.step ?? 1),
-          sourceText: String(row.source_text ?? ""),
-          postedAt: String(row.posted_at ?? row.created_at ?? ""),
-          winChance: Number(row.win_rate ?? row.win_chance ?? NaN),
-        };
-      }).filter((row) => row.period);
+      const signalsSucceeded = signalsResponse.status === "fulfilled" && !signalsResponse.value.error;
+      const signalRows = signalsSucceeded ? signalsResponse.value.data ?? [] : null;
+      const list: Signal[] = signalRows
+        ? signalRows.map((row: Record<string, unknown>, index: number) => {
+            const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
+            return {
+              signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
+              period: String(row.transaction_no ?? row.period ?? row.transaction_number ?? ""),
+              sourceDirection: String(row.source_direction ?? direction).toUpperCase() as Direction,
+              direction: (direction === "BIG" ? "BIG" : "SMALL") as Direction,
+              level: Number(row.level ?? row.step ?? 1),
+              sourceText: String(row.source_text ?? ""),
+              postedAt: String(row.posted_at ?? row.created_at ?? ""),
+              winChance: Number(row.win_rate ?? row.win_chance ?? NaN),
+            };
+          }).filter((row) => row.period)
+        : signals;
 
       const historyRows = historyResponse.status === "fulfilled" && !historyResponse.value.error
         ? historyResponse.value.data ?? []
-        : [];
+        : null;
       const historyResults: ResultRow[] = historyRows
-        .map((row: Record<string, unknown>) => ({
-          issueNumber: String(row.transaction_no ?? row.period ?? ""),
-          number: String(row.result ?? row.number ?? ""),
-          blockTimestamp: Number(row.block_timestamp ?? 0),
-        }))
-        .filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number));
+        ? historyRows.map((row: Record<string, unknown>) => ({
+            issueNumber: String(row.transaction_no ?? row.period ?? ""),
+            number: String(row.result ?? row.number ?? ""),
+            blockTimestamp: Number(row.block_timestamp ?? 0),
+          })).filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number))
+        : results;
       const byIssue = new Map<string, ResultRow>();
       historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
       const loadedResults = [...byIssue.values()].sort((a, b) =>
