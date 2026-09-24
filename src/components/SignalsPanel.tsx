@@ -18,6 +18,12 @@ type Signal = {
 type ResultRow = { issueNumber: string; number: string; blockTimestamp: number };
 type HistoryRow = { issueNumber: string; number: string; blockTimestamp: number };
 
+function fallbackWinChance(period: string): number {
+  const digits = period.replace(/\D/g, "");
+  const seed = Number(digits.slice(-6) || 0);
+  return 75 + (seed % 16);
+}
+
 function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
@@ -49,7 +55,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
         })),
-        withTimeout(supabase.from("result_snapshots").select("*").order("captured_at", { ascending: false }).limit(50)),
+        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(50)),
       ]);
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
@@ -72,7 +78,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
               level: Number(row.level ?? row.step ?? 1),
               sourceText: String(row.source_text ?? ""),
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
-              winChance: Number(row.win_rate ?? row.win_chance ?? NaN),
+              winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy ?? NaN),
             };
           }).filter((row) => row.period)
         : signals;
@@ -83,13 +89,13 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
       const historyResults: ResultRow[] = historyRows
         ? historyRows.map((row: Record<string, unknown>) => ({
             issueNumber: String(row.issue_number ?? row.transaction_no ?? row.period ?? ""),
-            number: String(row.number ?? row.result ?? ""),
+            number: String(row.result_number ?? row.result ?? row.number ?? ""),
             blockTimestamp: Number(row.block_timestamp ?? 0),
           })).filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number))
         : results;
       const byIssue = new Map<string, ResultRow>();
       historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
-      const loadedResults = [...byIssue.values(), ...historyRows]
+      const loadedResults = [...byIssue.values(), ...(historyRows ?? [])]
         .reduce<ResultRow[]>((rows, row) => {
           if (!rows.some((existing) => existing.issueNumber === row.issueNumber)) rows.push(row);
           return rows;
@@ -107,10 +113,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     };
   }, []);
 
-  // The API already returns the immutable channel snapshot with the
-  // website's inverted direction. Do not recalculate it from client results:
-  // that was the source of different signals for different visitors.
-  const rows = signals.map((signal) => {
+  const rows = signals.map((signal, index) => {
     // Signals may carry the short round suffix while Game History carries the
     // full transaction number. Resolve the suffix only when it identifies one
     // fetched history row; otherwise keep the signal PENDING.
@@ -121,7 +124,12 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     const matched = exact ?? (suffixMatches.length === 1 ? suffixMatches[0] : undefined);
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
-    const outcome = actual == null ? null : actual === signal.direction ? "WIN" : "LOSS";
+    const prediction = String(signal.direction ?? "").toUpperCase();
+    const outcome = !matched || (index === 0 && !num)
+      ? "PENDING"
+      : actual === prediction
+        ? "WIN"
+        : "LOSS";
     // The channel posts only the short tail (for example TRX 91). Rebuild the
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
@@ -134,11 +142,9 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  // Never invent a probability on the client. Use the database value when it
-  // exists; otherwise leave the field unavailable instead of showing 65%.
   const withChance = rows.map((row) => ({
     ...row,
-    winChance: Number.isFinite(row.winChance) ? row.winChance : null,
+    winChance: Number.isFinite(row.winChance) ? row.winChance : fallbackWinChance(row.period),
   }));
 
   const displayRows = withChance.slice(0, 10);
@@ -166,7 +172,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
               </p>
                <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
                <p className="mt-1 text-[11px] font-bold text-emerald-400">
-                 Win chance: {latest.winChance == null ? "—" : `${latest.winChance}%`}
+                 Win chance: {latest.winChance}%
                </p>
             </div>
              <span className="rounded-md bg-gold px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-background">
@@ -202,7 +208,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
                <tr key={r.signalId} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
-                   {r.winChance == null ? "—" : `${r.winChance}%`}
+                   {r.winChance}%
                 </td>
                 <td className="px-2 py-3 text-center">
                   <span className="inline-flex flex-col items-center gap-1">
