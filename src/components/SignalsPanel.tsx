@@ -22,37 +22,19 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
-const LOCKED_CHANCE_KEY = "signals:locked-win-chance:v1";
+function deterministicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>): number {
+  const digits = String(signal.period ?? "").replace(/\D/g, "");
+  const roundSeed = Number.parseInt(digits.slice(-4) || digits || "0", 10);
+  const baseChance = 60 + (roundSeed % 9);
 
-function dynamicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>, results: ResultRow[]): number {
   let consecutiveLosses = 0;
   for (let i = index + 1; i < rows.length; i += 1) {
-    if (rows[i].outcome === "PENDING") break;
     if (rows[i].outcome !== "LOSS") break;
     consecutiveLosses += 1;
   }
 
-  let calculatedChance = consecutiveLosses === 0 ? 62 : consecutiveLosses === 1 ? 70 : consecutiveLosses === 2 ? 80 : 92;
-  if (signal.level >= 3) calculatedChance += 3;
-  if (signal.level >= 5) calculatedChance += 2;
-
-  const recent = results.slice(0, 10);
-  const alignedCount = recent.filter((result) => dirOf(result.number) === signal.direction).length;
-  if (alignedCount >= 8) calculatedChance += 8;
-  else if (alignedCount >= 6) calculatedChance += 5;
-  else if (alignedCount < 4) calculatedChance -= 3;
-
-  return Math.min(99, Math.max(50, Math.round(calculatedChance)));
-}
-
-function readLockedWinChances(): Record<string, number> {
-  if (typeof window === "undefined") return {};
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(LOCKED_CHANCE_KEY) ?? "{}");
-    return stored && typeof stored === "object" ? stored : {};
-  } catch {
-    return {};
-  }
+  const lossBoost = consecutiveLosses >= 3 ? 30 : consecutiveLosses === 2 ? 22 : consecutiveLosses === 1 ? 12 : 0;
+  return Math.min(98, Math.max(60, baseChance + lossBoost));
 }
 
 function timestampMs(value: unknown): number {
@@ -66,7 +48,6 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const hasCompletedInitialLoad = useRef(false);
-  const lockedWinChances = useRef<Record<string, number>>(readLockedWinChances());
 
   useEffect(() => {
     let alive = true;
@@ -202,22 +183,10 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  const withChance = rows.map((row, index) => {
-    const lockKey = row.signalId || row.period;
-    const existing = lockedWinChances.current[lockKey];
-    const winChance = Number.isFinite(existing)
-      ? existing
-      : dynamicWinChance(row, index, rows, results);
-    if (!Number.isFinite(existing)) {
-      lockedWinChances.current[lockKey] = winChance;
-      try {
-        window.localStorage.setItem(LOCKED_CHANCE_KEY, JSON.stringify(lockedWinChances.current));
-      } catch {
-        // The in-memory lock still protects the current session if storage is unavailable.
-      }
-    }
-    return { ...row, winChance };
-  });
+  const withChance = rows.map((row, index) => ({
+    ...row,
+    winChance: deterministicWinChance(row, index, rows),
+  }));
 
   const displayRows = withChance.slice(0, 10);
   const latest = withChance[0];
