@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const BIG_IMG = "https://i.ibb.co/TM6j75MY/file-00000000cadc81fa82560b83392af859.png";
@@ -38,6 +38,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const hasCompletedInitialLoad = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -80,7 +81,6 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
         : [];
       const publicHistory = Array.isArray(resultsPayload?.data?.list) ? resultsPayload.data.list : [];
       const gameHistory = [...directHistory, ...publicHistory];
-      console.log("Game History Rows:", gameHistory);
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
@@ -116,9 +116,15 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
           return rows;
         }, [])
         .sort((a, b) => (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0));
-      setSignals(list);
-      setResults(loadedResults);
-      setError(list.length ? null : "No signals yet");
+      if (list.length > 0) {
+        setSignals(list);
+        setError(null);
+      }
+      if (loadedResults.length > 0) setResults(loadedResults);
+      if (!hasCompletedInitialLoad.current) {
+        hasCompletedInitialLoad.current = true;
+        if (list.length === 0) setError("No signals yet");
+      }
     };
     load();
     const id = setInterval(load, 3000);
@@ -130,11 +136,14 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const rows = signals.map((signal) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
+    const signalSuffixes = signalNo.length >= 4
+      ? [signalNo.slice(-4), signalNo.slice(-3), signalNo.slice(-2)]
+      : [signalNo];
     const signalTime = timestampMs(signal.postedAt);
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       const periodMatch = Boolean(signalNo && historyNo) && (
-        historyNo === signalNo || historyNo.endsWith(signalNo) || signalNo.endsWith(historyNo)
+        historyNo === signalNo || signalSuffixes.some((suffix) => historyNo.endsWith(suffix))
       );
       const timeMatch = signalTime > 0 && result.blockTimestamp > 0
         && Math.abs(signalTime - result.blockTimestamp) <= 90_000;
@@ -150,10 +159,11 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
     const latestIssue = results[0]?.issueNumber;
+    const displaySuffix = signalSuffixes[0] || signalNo;
     const fullPeriod =
       matched?.issueNumber ??
-      (latestIssue && latestIssue.length > signal.period.length
-        ? latestIssue.slice(0, latestIssue.length - signal.period.length) + signal.period
+      (latestIssue && displaySuffix
+        ? latestIssue.slice(0, Math.max(0, latestIssue.length - displaySuffix.length)) + displaySuffix
         : signal.period);
     return { ...signal, num, outcome, fullPeriod };
   });
