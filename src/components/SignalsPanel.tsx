@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const BIG_IMG = "https://i.ibb.co/TM6j75MY/file-00000000cadc81fa82560b83392af859.png";
 const SMALL_IMG = "https://i.ibb.co/KzKMFjGZ/file-000000002a8881faa2dbc928498411ad.png";
@@ -26,20 +27,59 @@ export function SignalsPanel() {
 
   useEffect(() => {
     let alive = true;
-    const load = async () => {
+    const withTimeout = async <T,>(promise: Promise<T>, ms = 4500): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const [sr, rr] = await Promise.all([
-          fetch("/api/public/signals").then((r) => r.json()),
-          fetch("/api/public/results").then((r) => r.json()),
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("request timeout")), ms);
+          }),
         ]);
-        if (!alive) return;
-        const list: Signal[] = sr?.list ?? [];
-        setSignals(list);
-        setResults((rr?.data?.list ?? []) as ResultRow[]);
-        setError(list.length ? null : "No signals yet");
-      } catch {
-        if (alive) setError("Connection failed");
+      } finally {
+        if (timer) clearTimeout(timer);
       }
+    };
+
+    const load = async () => {
+      const [signalResponse, resultResponse] = await Promise.allSettled([
+        withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`signals ${response.status}`);
+          return response.json();
+        })),
+        withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`results ${response.status}`);
+          return response.json();
+        })),
+      ]);
+      if (!alive) return;
+
+      let list: Signal[] =
+        signalResponse.status === "fulfilled" ? signalResponse.value?.list ?? [] : [];
+      if (!list.length) {
+        const fallback = await withTimeout(
+          supabase
+            .from("signal_snapshots")
+            .select("signal_id, period, source_direction, website_direction, level, source_text, posted_at")
+            .order("posted_at", { ascending: false })
+            .limit(100),
+        ).catch(() => ({ data: [], error: null }));
+        list = (fallback.data ?? []).map((row) => ({
+          signalId: row.signal_id,
+          period: String(row.period),
+          sourceDirection: row.source_direction as Direction,
+          direction: row.website_direction as Direction,
+          level: Number(row.level ?? 1),
+          sourceText: row.source_text ?? "",
+          postedAt: row.posted_at,
+        }));
+      }
+
+      const loadedResults: ResultRow[] =
+        resultResponse.status === "fulfilled" ? (resultResponse.value?.data?.list ?? []) : [];
+      setSignals(list);
+      setResults(loadedResults);
+      setError(list.length ? null : "No signals yet");
     };
     load();
     const id = setInterval(load, 3000);
