@@ -7,12 +7,11 @@ const OWNER_TG = "5471930058";
 
 function handleContactOwner() {
   const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void; openLink?: (url: string) => void } } }).Telegram?.WebApp;
-  const tgDeepLink = `tg://user?id=${OWNER_TG}`;
-  const webLink = `https://t.me/user?id=${OWNER_TG}`;
+  const tgLink = "https://t.me/Thetpyinn7";
 
   if (tg?.openTelegramLink) {
     try {
-      tg.openTelegramLink(tgDeepLink);
+      tg.openTelegramLink(tgLink);
       return;
     } catch (error) {
       console.warn("openTelegramLink failed, trying openLink", error);
@@ -20,13 +19,13 @@ function handleContactOwner() {
   }
   if (tg?.openLink) {
     try {
-      tg.openLink(webLink);
+      tg.openLink(tgLink);
       return;
     } catch (error) {
       console.warn("openLink failed", error);
     }
   }
-  window.location.href = tgDeepLink;
+  window.location.href = tgLink;
 }
 
 export function VipLocked() {
@@ -49,9 +48,16 @@ export function VipLocked() {
       >
         Contact Owner for VIP
       </button>
-      <p className="mt-3 font-display text-xs text-muted-foreground">
-        Telegram ID: {OWNER_TG}
-      </p>
+      <a
+        href="https://t.me/Thetpyinn7"
+        onClick={(event) => {
+          event.preventDefault();
+          handleContactOwner();
+        }}
+        className="mt-3 inline-block font-display text-xs text-primary underline underline-offset-2"
+      >
+        @Thetpyinn7
+      </a>
     </div>
   );
 }

@@ -23,21 +23,22 @@ function dirOf(num: string): Direction {
 }
 
 function dynamicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>, results: ResultRow[]): number {
-  let calculatedChance = 68;
   let consecutiveLosses = 0;
-  for (let i = index + 1; i < rows.length && rows[i].outcome !== "PENDING"; i += 1) {
+  for (let i = index + 1; i < rows.length; i += 1) {
+    if (rows[i].outcome === "PENDING") break;
     if (rows[i].outcome !== "LOSS") break;
     consecutiveLosses += 1;
   }
-  calculatedChance += consecutiveLosses >= 3 ? 20 : consecutiveLosses * 7;
-  calculatedChance += Math.max(0, signal.level - 1) * 2;
+
+  let calculatedChance = consecutiveLosses === 0 ? 62 : consecutiveLosses === 1 ? 70 : consecutiveLosses === 2 ? 80 : 92;
+  if (signal.level >= 3) calculatedChance += 3;
+  if (signal.level >= 5) calculatedChance += 2;
 
   const recent = results.slice(0, 10);
   const alignedCount = recent.filter((result) => dirOf(result.number) === signal.direction).length;
-  if (alignedCount >= 8) calculatedChance += 15;
-  else if (alignedCount === 7) calculatedChance += 10;
-  else if (alignedCount === 6) calculatedChance += 6;
-  else if (alignedCount < 4) calculatedChance -= 5;
+  if (alignedCount >= 8) calculatedChance += 8;
+  else if (alignedCount >= 6) calculatedChance += 5;
+  else if (alignedCount < 4) calculatedChance -= 3;
 
   return Math.min(99, Math.max(50, Math.round(calculatedChance)));
 }
