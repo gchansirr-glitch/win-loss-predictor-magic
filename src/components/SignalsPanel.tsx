@@ -18,12 +18,6 @@ type Signal = {
 type ResultRow = { issueNumber: string; number: string; blockTimestamp: number };
 type HistoryRow = { issueNumber: string; number: string; blockTimestamp: number };
 
-function fallbackWinChance(period: string): number {
-  const digits = period.replace(/\D/g, "");
-  const seed = Number(digits.slice(-6) || 0);
-  return 75 + (seed % 16);
-}
-
 function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
@@ -55,7 +49,12 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
         })),
-        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(50)),
+        // The History tab is powered by this same public results endpoint.
+        // Use its persisted Supabase snapshot rows for strict settlement.
+        withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`history ${response.status}`);
+          return response.json();
+        })),
       ]);
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
@@ -63,6 +62,9 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
       if (!alive) return;
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
+      const historyPayload = historyResponse.status === "fulfilled" ? historyResponse.value : null;
+      const gameHistory = Array.isArray(historyPayload?.data?.list) ? historyPayload.data.list : [];
+      console.log("Game History Rows:", gameHistory);
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
@@ -83,16 +85,13 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
           }).filter((row) => row.period)
         : signals;
 
-      const historyRows = historyResponse.status === "fulfilled" && !historyResponse.value.error
-        ? historyResponse.value.data ?? []
-        : null;
-      const historyResults: ResultRow[] = historyRows
-        ? historyRows.map((row: Record<string, unknown>) => ({
-            issueNumber: String(row.issue_number ?? row.transaction_no ?? row.period ?? ""),
-            number: String(row.result_number ?? row.result ?? row.number ?? ""),
-            blockTimestamp: Number(row.block_timestamp ?? 0),
-          })).filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number))
-        : results;
+      const historyResults: ResultRow[] = gameHistory
+        .map((row: Record<string, unknown>) => ({
+          issueNumber: String(row.issue_number ?? row.transaction_no ?? row.period ?? ""),
+          number: String(row.result_number ?? row.number ?? row.result ?? ""),
+          blockTimestamp: Number(row.block_timestamp ?? 0),
+        }))
+        .filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
       historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
       const loadedResults = [...byIssue.values(), ...(historyRows ?? [])]
@@ -145,7 +144,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const withChance = rows.map((row) => ({
     ...row,
-    winChance: Number.isFinite(row.winChance) ? row.winChance : fallbackWinChance(row.period),
+    winChance: Number.isFinite(row.winChance) ? row.winChance : null,
   }));
 
   const displayRows = withChance.slice(0, 10);
@@ -173,7 +172,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
               </p>
                <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
                <p className="mt-1 text-[11px] font-bold text-emerald-400">
-                 Win chance: {latest.winChance}%
+                 Win chance: {latest.winChance == null ? "—" : `${latest.winChance}%`}
                </p>
             </div>
              <span className="rounded-md bg-gold px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-background">
@@ -209,7 +208,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
                <tr key={r.signalId} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
-                   {r.winChance}%
+                   {r.winChance == null ? "—" : `${r.winChance}%`}
                 </td>
                 <td className="px-2 py-3 text-center">
                   <span className="inline-flex flex-col items-center gap-1">
