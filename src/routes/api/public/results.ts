@@ -26,30 +26,35 @@ type ResultRow = {
 };
 
 async function fetchResults() {
-  let lastStatus = 502;
-  for (const source of SOURCES) {
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const separator = source.includes("?") ? "&" : "?";
-        const res = await fetch(`${source}${separator}pageSize=100&pageNo=1&ts=${Date.now()}`, {
-          headers: {
-            accept: "application/json, text/plain, */*",
-            "user-agent": REQUEST_HEADERS["user-agent"],
-          },
-          cache: "no-store",
-        });
-        lastStatus = res.status;
-        if (res.ok) {
-          const contentType = res.headers.get("content-type") ?? "";
-          if (contentType.includes("json") || source !== DIRECT_SOURCE) return res;
-        }
-      } catch {
-        lastStatus = 502;
-      }
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, attempt * 400));
-    }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const separator = DIRECT_SOURCE.includes("?") ? "&" : "?";
+    const response = await fetch(`${DIRECT_SOURCE}${separator}pageSize=100&pageNo=1&ts=${Date.now()}`, {
+      headers: REQUEST_HEADERS,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`upstream ${response.status}`);
+    return response;
+  } finally {
+    clearTimeout(timeout);
   }
-  throw new Error(`upstream ${lastStatus}`);
+}
+
+async function readStoredResults(supabase: typeof import("@/integrations/supabase/client.server").supabaseAdmin): Promise<ResultRow[]> {
+  const { data, error } = await supabase
+    .from("result_snapshots")
+    .select("issue_number, number, color, block_timestamp")
+    .order("issue_number", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    issueNumber: String(row.issue_number),
+    number: String(row.number),
+    color: String(row.color ?? ""),
+    blockTimestamp: Number(row.block_timestamp ?? 0),
+  }));
 }
 
 async function fetchTelegramResults(): Promise<ResultRow[]> {
@@ -134,11 +139,10 @@ export const Route = createFileRoute("/api/public/results")({
             liveRows = normalizeRows(json);
                     } catch (upstreamError) {
             console.error("[v0] results upstream unavailable:", String(upstreamError));
-            try {
-              liveRows = await fetchTelegramResults();
-            } catch (telegramError) {
-              console.error("[v0] Telegram results fallback unavailable:", String(telegramError));
-            }
+            liveRows = await readStoredResults(supabase).catch((storedError) => {
+              console.error("[v0] stored results fallback unavailable:", String(storedError));
+              return [];
+            });
           }
 
           // The upstream JSON exposes the digit but not always the game's
@@ -183,7 +187,11 @@ export const Route = createFileRoute("/api/public/results")({
             .order("issue_number", { ascending: false })
             .limit(100);
 
-          if (readError) throw new Error(readError.message);
+          if (readError) {
+            return new Response(JSON.stringify({ data: { list: liveRows.slice(0, 100) } }), {
+              headers: { "content-type": "application/json", "cache-control": "no-store" },
+            });
+          }
 
           const liveByIssue = new Map(liveRows.map((row) => [row.issueNumber, row]));
           const list = (stored ?? []).map((row) => {
@@ -212,9 +220,9 @@ export const Route = createFileRoute("/api/public/results")({
             },
           });
         } catch (e) {
-          return new Response(JSON.stringify({ error: String(e) }), {
-            status: 502,
-            headers: { "content-type": "application/json" },
+          return new Response(JSON.stringify({ data: { list: [] } }), {
+            status: 200,
+            headers: { "content-type": "application/json", "cache-control": "no-store" },
           });
         }
       },

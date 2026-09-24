@@ -57,7 +57,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     };
 
     const load = async () => {
-      const [signalsApiResponse, historyResponse, resultsApiResponse] = await Promise.allSettled([
+      const [signalsApiResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
@@ -67,6 +67,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
           if (!response.ok) throw new Error(`results ${response.status}`);
           return response.json();
         })),
+        withTimeout(supabase.from("result_snapshots").select("*").order("issue_number", { ascending: false }).limit(50)),
       ]);
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
@@ -76,11 +77,15 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const historyPayload = historyResponse.status === "fulfilled" ? historyResponse.value : null;
       const resultsPayload = resultsApiResponse.status === "fulfilled" ? resultsApiResponse.value : null;
+      const snapshotsPayload = snapshotsResponse.status === "fulfilled" ? snapshotsResponse.value : null;
       const directHistory = historyPayload && "data" in historyPayload && Array.isArray(historyPayload.data)
         ? historyPayload.data
         : [];
       const publicHistory = Array.isArray(resultsPayload?.data?.list) ? resultsPayload.data.list : [];
-      const gameHistory = [...directHistory, ...publicHistory];
+      const snapshotHistory = snapshotsPayload && "data" in snapshotsPayload && Array.isArray(snapshotsPayload.data)
+        ? snapshotsPayload.data
+        : [];
+      const gameHistory = [...directHistory, ...publicHistory, ...snapshotHistory];
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
