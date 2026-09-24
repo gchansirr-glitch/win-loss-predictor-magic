@@ -42,13 +42,17 @@ export function SignalsPanel() {
     };
 
     const load = async () => {
-      const [signalResponse, resultResponse] = await Promise.allSettled([
+      const [signalResponse, resultResponse, browserResultResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
         })),
         withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`results ${response.status}`);
+          return response.json();
+        })),
+        withTimeout(fetch(`https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=100&pageNo=1&t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`browser results ${response.status}`);
           return response.json();
         })),
       ]);
@@ -75,8 +79,26 @@ export function SignalsPanel() {
         }));
       }
 
-      const loadedResults: ResultRow[] =
+      const apiResults: ResultRow[] =
         resultResponse.status === "fulfilled" ? (resultResponse.value?.data?.list ?? []) : [];
+      const browserPayload = browserResultResponse.status === "fulfilled" ? browserResultResponse.value : null;
+      const browserRows = Array.isArray(browserPayload?.data?.list)
+        ? browserPayload.data.list
+        : Array.isArray(browserPayload?.data)
+          ? browserPayload.data
+          : [];
+      const browserResults: ResultRow[] = browserRows
+        .map((row: Record<string, unknown>) => ({
+          issueNumber: String(row.issue ?? row.issueNumber ?? row.period ?? ""),
+          number: String(row.result ?? row.number ?? row.winNumber ?? ""),
+          blockTimestamp: Number(row.blockTimestamp ?? row.timestamp ?? 0),
+        }))
+        .filter((row: ResultRow) => row.issueNumber && row.number);
+      const byIssue = new Map<string, ResultRow>();
+      [...apiResults, ...browserResults].forEach((row) => byIssue.set(row.issueNumber, row));
+      const loadedResults = [...byIssue.values()].sort((a, b) =>
+        Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)),
+      );
       setSignals(list);
       setResults(loadedResults);
       setError(list.length ? null : "No signals yet");
