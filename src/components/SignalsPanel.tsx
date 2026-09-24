@@ -13,6 +13,7 @@ type Signal = {
   level: number;
   sourceText: string;
   postedAt: string | null;
+  winChance?: number | null;
 };
 type ResultRow = { issueNumber: string; number: string; blockTimestamp: number };
 
@@ -42,7 +43,7 @@ export function SignalsPanel() {
     };
 
     const load = async () => {
-      const [signalResponse, resultResponse, browserResultResponse] = await Promise.allSettled([
+      const [signalResponse, resultResponse, browserResultResponse, historyResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
@@ -51,10 +52,13 @@ export function SignalsPanel() {
           if (!response.ok) throw new Error(`results ${response.status}`);
           return response.json();
         })),
-        withTimeout(fetch(`https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?pageSize=100&pageNo=1&t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) throw new Error(`browser results ${response.status}`);
-          return response.json();
-        })),
+        withTimeout(
+          supabase
+            .from("game_history")
+            .select("transaction_no, period, result, number, block_timestamp")
+            .order("period", { ascending: false })
+            .limit(50),
+        ),
       ]);
       if (!alive) return;
 
@@ -76,26 +80,24 @@ export function SignalsPanel() {
           level: Number(row.level ?? 1),
           sourceText: row.source_text ?? "",
           postedAt: row.posted_at,
+          winChance: Number(row.win_chance ?? row.win_rate ?? NaN),
         }));
       }
 
       const apiResults: ResultRow[] =
         resultResponse.status === "fulfilled" ? (resultResponse.value?.data?.list ?? []) : [];
-      const browserPayload = browserResultResponse.status === "fulfilled" ? browserResultResponse.value : null;
-      const browserRows = Array.isArray(browserPayload?.data?.list)
-        ? browserPayload.data.list
-        : Array.isArray(browserPayload?.data)
-          ? browserPayload.data
-          : [];
-      const browserResults: ResultRow[] = browserRows
+      const historyRows = historyResponse.status === "fulfilled" && !historyResponse.value.error
+        ? historyResponse.value.data ?? []
+        : [];
+      const historyResults: ResultRow[] = historyRows
         .map((row: Record<string, unknown>) => ({
-          issueNumber: String(row.issue ?? row.issueNumber ?? row.period ?? ""),
-          number: String(row.result ?? row.number ?? row.winNumber ?? ""),
-          blockTimestamp: Number(row.blockTimestamp ?? row.timestamp ?? 0),
+          issueNumber: String(row.transaction_no ?? row.period ?? ""),
+          number: String(row.result ?? row.number ?? ""),
+          blockTimestamp: Number(row.block_timestamp ?? 0),
         }))
-        .filter((row: ResultRow) => row.issueNumber && row.number);
+        .filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
-      [...apiResults, ...browserResults].forEach((row) => byIssue.set(row.issueNumber, row));
+      [...apiResults, ...historyResults].forEach((row) => byIssue.set(row.issueNumber, row));
       const loadedResults = [...byIssue.values()].sort((a, b) =>
         Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)),
       );
@@ -138,18 +140,12 @@ export function SignalsPanel() {
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  // Win chance: starts at 50%, rises with how strongly the last 10 results
-  // trend toward the signal direction, and rises a little more after losses.
-  const last10 = results.slice(0, 10).map((r) => dirOf(r.number));
-  const withChance = rows.map((row, index) => {
-    const matching = last10.filter((d) => d === row.direction).length;
-    const trendBonus = last10.length ? Math.round((matching / last10.length) * 30) : 15;
-    const recentLosses = rows
-      .slice(index + 1, index + 6)
-      .filter((r) => r.outcome === "LOSS").length;
-    const winChance = Math.min(90, Math.max(50, 50 + trendBonus + recentLosses * 2));
-    return { ...row, winChance };
-  });
+  // Never invent a probability on the client. Use the database value when it
+  // exists; otherwise leave the field unavailable instead of showing 65%.
+  const withChance = rows.map((row) => ({
+    ...row,
+    winChance: Number.isFinite(row.winChance) ? row.winChance : null,
+  }));
 
   const displayRows = withChance.slice(0, 10);
   const latest = withChance[0];
@@ -176,7 +172,7 @@ export function SignalsPanel() {
               </p>
                <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
                <p className="mt-1 text-[11px] font-bold text-emerald-400">
-                 Win chance: {latest.winChance}%
+                 Win chance: {latest.winChance == null ? "—" : `${latest.winChance}%`}
                </p>
             </div>
              <span className="rounded-md bg-gold px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-background">
@@ -212,7 +208,7 @@ export function SignalsPanel() {
                <tr key={r.signalId} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
-                   {r.winChance}%
+                   {r.winChance == null ? "—" : `${r.winChance}%`}
                 </td>
                 <td className="px-2 py-3 text-center">
                   <span className="inline-flex flex-col items-center gap-1">
