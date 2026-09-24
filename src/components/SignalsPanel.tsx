@@ -93,10 +93,14 @@ export function SignalsPanel() {
   // website's inverted direction. Do not recalculate it from client results:
   // that was the source of different signals for different visitors.
   const rows = signals.map((signal) => {
-    // A signal stays PENDING until its exact transaction/period appears in
-    // the fetched Game History rows. Never settle against a suffix or nearby
-    // round because that can evaluate a signal before its own result exists.
-    const matched = results.find((result) => result.issueNumber === signal.period);
+    // Signals may carry the short round suffix while Game History carries the
+    // full transaction number. Resolve the suffix only when it identifies one
+    // fetched history row; otherwise keep the signal PENDING.
+    const exact = results.find((result) => result.issueNumber === signal.period);
+    const suffixMatches = exact
+      ? []
+      : results.filter((result) => result.issueNumber.endsWith(signal.period));
+    const matched = exact ?? (suffixMatches.length === 1 ? suffixMatches[0] : undefined);
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const outcome = actual == null ? null : actual === signal.direction ? "WIN" : "LOSS";
