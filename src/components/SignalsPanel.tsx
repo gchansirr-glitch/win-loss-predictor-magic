@@ -67,7 +67,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
         ? historyPayload.data
         : [];
       const publicHistory = Array.isArray(resultsPayload?.data?.list) ? resultsPayload.data.list : [];
-      const gameHistory = directHistory.length ? directHistory : publicHistory;
+      const gameHistory = [...directHistory, ...publicHistory];
       console.log("Game History Rows:", gameHistory);
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
@@ -84,18 +84,18 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
               level: Number(row.level ?? row.step ?? 1),
               sourceText: String(row.source_text ?? ""),
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
-              winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy ?? NaN),
+              winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy),
             };
           }).filter((row) => row.period)
         : signals;
 
       const historyResults: ResultRow[] = gameHistory
         .map((row: Record<string, unknown>) => ({
-          issueNumber: String(row.issue_number ?? row.issueNumber ?? row.transaction_no ?? row.period ?? ""),
-          number: String(row.result_number ?? row.number ?? row.result ?? ""),
-          blockTimestamp: Number(row.block_timestamp ?? 0),
+          issueNumber: String(row.issue_number ?? row.issueNumber ?? row.transaction_no ?? row.period ?? "").trim(),
+          number: String(row.result_number ?? row.number ?? row.result ?? "").trim(),
+          blockTimestamp: Number(row.block_timestamp ?? row.created_at ?? 0),
         }))
-        .filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number));
+        .filter((row: ResultRow) => /^\d+$/.test(row.issueNumber) && /^\d$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
       historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
       const loadedResults = [...byIssue.values()]
@@ -117,10 +117,13 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
   }, []);
 
   const rows = signals.map((signal) => {
-    const signalNo = String(signal.period ?? "").trim();
-    const matched = results.find((result) =>
-      String(result.issueNumber ?? "").trim() === signalNo,
-    );
+    const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
+    const matched = results.find((result) => {
+      const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
+      return Boolean(signalNo && historyNo) && (
+        historyNo === signalNo || historyNo.endsWith(signalNo) || signalNo.endsWith(historyNo)
+      );
+    });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const prediction = String(signal.direction ?? "").toUpperCase();
@@ -141,7 +144,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const withChance = rows.map((row) => ({
     ...row,
-    winChance: row.winChance,
+    winChance: Number.isFinite(row.winChance) ? row.winChance : null,
   }));
 
   const displayRows = withChance.slice(0, 10);
