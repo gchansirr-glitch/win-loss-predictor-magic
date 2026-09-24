@@ -22,6 +22,8 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
+const LOCKED_CHANCE_KEY = "signals:locked-win-chance:v1";
+
 function dynamicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>, results: ResultRow[]): number {
   let consecutiveLosses = 0;
   for (let i = index + 1; i < rows.length; i += 1) {
@@ -43,6 +45,16 @@ function dynamicWinChance(signal: Signal, index: number, rows: Array<{ outcome: 
   return Math.min(99, Math.max(50, Math.round(calculatedChance)));
 }
 
+function readLockedWinChances(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(LOCKED_CHANCE_KEY) ?? "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
 function timestampMs(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value < 10_000_000_000 ? value * 1000 : value;
   const parsed = Date.parse(String(value ?? ""));
@@ -54,6 +66,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const hasCompletedInitialLoad = useRef(false);
+  const lockedWinChances = useRef<Record<string, number>>(readLockedWinChances());
 
   useEffect(() => {
     let alive = true;
@@ -189,10 +202,22 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  const withChance = rows.map((row, index) => ({
-    ...row,
-    winChance: dynamicWinChance(row, index, rows, results),
-  }));
+  const withChance = rows.map((row, index) => {
+    const lockKey = row.signalId || row.period;
+    const existing = lockedWinChances.current[lockKey];
+    const winChance = Number.isFinite(existing)
+      ? existing
+      : dynamicWinChance(row, index, rows, results);
+    if (!Number.isFinite(existing)) {
+      lockedWinChances.current[lockKey] = winChance;
+      try {
+        window.localStorage.setItem(LOCKED_CHANCE_KEY, JSON.stringify(lockedWinChances.current));
+      } catch {
+        // The in-memory lock still protects the current session if storage is unavailable.
+      }
+    }
+    return { ...row, winChance };
+  });
 
   const displayRows = withChance.slice(0, 10);
   const latest = withChance[0];
