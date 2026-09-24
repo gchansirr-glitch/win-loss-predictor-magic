@@ -1,7 +1,33 @@
+"use client";
+
 const LOCK_IMG = "https://i.ibb.co/M0d0b90/file-00000000761c820b8ab63dbcb68674f8.png";
 const WELCOME_IMG = "https://i.ibb.co/PZ85sz4V/file-00000000888c81faaf389bdf2f54ade2.png";
 
 const OWNER_TG = "5471930058";
+
+function handleContactOwner() {
+  const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void; openLink?: (url: string) => void } } }).Telegram?.WebApp;
+  const tgDeepLink = `tg://user?id=${OWNER_TG}`;
+  const webLink = `https://t.me/user?id=${OWNER_TG}`;
+
+  if (tg?.openTelegramLink) {
+    try {
+      tg.openTelegramLink(tgDeepLink);
+      return;
+    } catch (error) {
+      console.warn("openTelegramLink failed, trying openLink", error);
+    }
+  }
+  if (tg?.openLink) {
+    try {
+      tg.openLink(webLink);
+      return;
+    } catch (error) {
+      console.warn("openLink failed", error);
+    }
+  }
+  window.location.href = tgDeepLink;
+}
 
 export function VipLocked() {
   return (
@@ -16,12 +42,13 @@ export function VipLocked() {
         ဒီ signals တွေကို VIP member များသာ ကြည့်ရှုနိုင်ပါသည်။ VIP ရယူရန် owner ကို
         ဆက်သွယ်ပါ။
       </p>
-      <a
-        href={`tg://user?id=${OWNER_TG}`}
+      <button
+        type="button"
+        onClick={handleContactOwner}
         className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-3 font-display text-sm font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-primary/90"
       >
         Contact Owner for VIP
-      </a>
+      </button>
       <p className="mt-3 font-display text-xs text-muted-foreground">
         Telegram ID: {OWNER_TG}
       </p>
