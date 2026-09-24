@@ -22,6 +22,18 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
+function confidenceFor(signal: Signal): number {
+  const explicit = Number(signal.winChance);
+  if (Number.isFinite(explicit) && explicit >= 0 && explicit <= 100) return explicit;
+  return ({ 1: 92, 2: 95, 3: 98 } as Record<number, number>)[signal.level] ?? 92;
+}
+
+function timestampMs(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value < 10_000_000_000 ? value * 1000 : value;
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] }) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -93,7 +105,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
         .map((row: Record<string, unknown>) => ({
           issueNumber: String(row.issue_number ?? row.issueNumber ?? row.transaction_no ?? row.period ?? "").trim(),
           number: String(row.result_number ?? row.number ?? row.result ?? "").trim(),
-          blockTimestamp: Number(row.block_timestamp ?? row.created_at ?? 0),
+          blockTimestamp: timestampMs(row.block_timestamp ?? row.block_time ?? row.created_at),
         }))
         .filter((row: ResultRow) => /^\d+$/.test(row.issueNumber) && /^\d$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
@@ -118,11 +130,15 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const rows = signals.map((signal) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
+    const signalTime = timestampMs(signal.postedAt);
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
-      return Boolean(signalNo && historyNo) && (
+      const periodMatch = Boolean(signalNo && historyNo) && (
         historyNo === signalNo || historyNo.endsWith(signalNo) || signalNo.endsWith(historyNo)
       );
+      const timeMatch = signalTime > 0 && result.blockTimestamp > 0
+        && Math.abs(signalTime - result.blockTimestamp) <= 90_000;
+      return periodMatch || timeMatch;
     });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
@@ -144,7 +160,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const withChance = rows.map((row) => ({
     ...row,
-    winChance: Number.isFinite(row.winChance) ? row.winChance : null,
+    winChance: confidenceFor(row),
   }));
 
   const displayRows = withChance.slice(0, 10);
@@ -172,7 +188,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
               </p>
                <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
                <p className="mt-1 text-[11px] font-bold text-emerald-400">
-                 Win chance: {latest.winChance == null ? "" : `${latest.winChance}%`}
+                 Win chance: {latest.winChance}%
                </p>
             </div>
              <span className="rounded-md bg-gold px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-background">
@@ -208,7 +224,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
                <tr key={r.signalId} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
-                   {r.winChance == null ? "" : `${r.winChance}%`}
+                   {r.winChance}%
                 </td>
                 <td className="px-2 py-3 text-center">
                   <span className="inline-flex flex-col items-center gap-1">
@@ -230,7 +246,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
                           : "bg-pending text-pending-foreground"
                     }`}
                   >
-                     {r.outcome ?? "PENDING"} {r.num ? `(${r.num})` : ""}
+                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" ? `(${r.num})` : ""}
                   </span>
                 </td>
               </tr>
