@@ -44,8 +44,8 @@ export function SignalsPanel() {
 
     const load = async () => {
       const [signalsResponse, historyResponse] = await Promise.allSettled([
-        withTimeout(supabase.from("signals").select("*").order("created_at", { ascending: false }).limit(20)),
-        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(50)),
+        withTimeout(supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20)),
+        withTimeout(supabase.from("result_snapshots").select("*").order("captured_at", { ascending: false }).limit(50)),
       ]);
       if (!alive) return;
 
@@ -56,7 +56,7 @@ export function SignalsPanel() {
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
             return {
               signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
-              period: String(row.transaction_no ?? row.period ?? row.transaction_number ?? ""),
+              period: String(row.period ?? row.transaction_no ?? row.transaction_number ?? ""),
               sourceDirection: String(row.source_direction ?? direction).toUpperCase() as Direction,
               direction: (direction === "BIG" ? "BIG" : "SMALL") as Direction,
               level: Number(row.level ?? row.step ?? 1),
@@ -72,8 +72,8 @@ export function SignalsPanel() {
         : null;
       const historyResults: ResultRow[] = historyRows
         ? historyRows.map((row: Record<string, unknown>) => ({
-            issueNumber: String(row.transaction_no ?? row.period ?? ""),
-            number: String(row.result ?? row.number ?? ""),
+            issueNumber: String(row.issue_number ?? row.transaction_no ?? row.period ?? ""),
+            number: String(row.number ?? row.result ?? ""),
             blockTimestamp: Number(row.block_timestamp ?? 0),
           })).filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number))
         : results;
