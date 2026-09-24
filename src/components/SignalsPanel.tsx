@@ -22,10 +22,24 @@ function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
-function confidenceFor(signal: Signal): number {
-  const explicit = Number(signal.winChance);
-  if (Number.isFinite(explicit) && explicit >= 0 && explicit <= 100) return explicit;
-  return ({ 1: 92, 2: 95, 3: 98 } as Record<number, number>)[signal.level] ?? 92;
+function dynamicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>, results: ResultRow[]): number {
+  let calculatedChance = 68;
+  let consecutiveLosses = 0;
+  for (let i = index + 1; i < rows.length && rows[i].outcome !== "PENDING"; i += 1) {
+    if (rows[i].outcome !== "LOSS") break;
+    consecutiveLosses += 1;
+  }
+  calculatedChance += consecutiveLosses >= 3 ? 20 : consecutiveLosses * 7;
+  calculatedChance += Math.max(0, signal.level - 1) * 2;
+
+  const recent = results.slice(0, 10);
+  const alignedCount = recent.filter((result) => dirOf(result.number) === signal.direction).length;
+  if (alignedCount >= 8) calculatedChance += 15;
+  else if (alignedCount === 7) calculatedChance += 10;
+  else if (alignedCount === 6) calculatedChance += 6;
+  else if (alignedCount < 4) calculatedChance -= 5;
+
+  return Math.min(99, Math.max(50, Math.round(calculatedChance)));
 }
 
 function timestampMs(value: unknown): number {
@@ -174,9 +188,9 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  const withChance = rows.map((row) => ({
+  const withChance = rows.map((row, index) => ({
     ...row,
-    winChance: confidenceFor(row),
+    winChance: dynamicWinChance(row, index, rows, results),
   }));
 
   const displayRows = withChance.slice(0, 10);
