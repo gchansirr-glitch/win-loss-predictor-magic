@@ -28,7 +28,7 @@ export function SignalsPanel() {
 
   useEffect(() => {
     let alive = true;
-    const withTimeout = async <T,>(promise: Promise<T>, ms = 4500): Promise<T> => {
+    const withTimeout = async <T,>(promise: Promise<T>, ms = 3000): Promise<T> => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return await Promise.race([
@@ -43,49 +43,29 @@ export function SignalsPanel() {
     };
 
     const load = async () => {
-      const [signalResponse, resultResponse, browserResultResponse, historyResponse] = await Promise.allSettled([
-        withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) throw new Error(`signals ${response.status}`);
-          return response.json();
-        })),
-        withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) throw new Error(`results ${response.status}`);
-          return response.json();
-        })),
-        withTimeout(
-          supabase
-            .from("game_history")
-            .select("transaction_no, period, result, number, block_timestamp")
-            .order("period", { ascending: false })
-            .limit(50),
-        ),
+      const [signalsResponse, historyResponse] = await Promise.allSettled([
+        withTimeout(supabase.from("signals").select("*").order("created_at", { ascending: false }).limit(100)),
+        withTimeout(supabase.from("game_history").select("*").limit(50)),
       ]);
       if (!alive) return;
 
-      let list: Signal[] =
-        signalResponse.status === "fulfilled" ? signalResponse.value?.list ?? [] : [];
-      if (!list.length) {
-        const fallback = await withTimeout(
-          supabase
-            .from("signal_snapshots")
-            .select("signal_id, period, source_direction, website_direction, level, source_text, posted_at")
-            .order("posted_at", { ascending: false })
-            .limit(100),
-        ).catch(() => ({ data: [], error: null }));
-        list = (fallback.data ?? []).map((row) => ({
-          signalId: row.signal_id,
-          period: String(row.period),
-          sourceDirection: row.source_direction as Direction,
-          direction: row.website_direction as Direction,
-          level: Number(row.level ?? 1),
-          sourceText: row.source_text ?? "",
-          postedAt: row.posted_at,
-          winChance: Number(row.win_chance ?? row.win_rate ?? NaN),
-        }));
-      }
+      const signalRows = signalsResponse.status === "fulfilled" && !signalsResponse.value.error
+        ? signalsResponse.value.data ?? []
+        : [];
+      const list: Signal[] = signalRows.map((row: Record<string, unknown>, index: number) => {
+        const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
+        return {
+          signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
+          period: String(row.transaction_no ?? row.period ?? row.transaction_number ?? ""),
+          sourceDirection: String(row.source_direction ?? direction).toUpperCase() as Direction,
+          direction: (direction === "BIG" ? "BIG" : "SMALL") as Direction,
+          level: Number(row.level ?? row.step ?? 1),
+          sourceText: String(row.source_text ?? ""),
+          postedAt: String(row.posted_at ?? row.created_at ?? ""),
+          winChance: Number(row.win_rate ?? row.win_chance ?? NaN),
+        };
+      }).filter((row) => row.period);
 
-      const apiResults: ResultRow[] =
-        resultResponse.status === "fulfilled" ? (resultResponse.value?.data?.list ?? []) : [];
       const historyRows = historyResponse.status === "fulfilled" && !historyResponse.value.error
         ? historyResponse.value.data ?? []
         : [];
@@ -97,9 +77,9 @@ export function SignalsPanel() {
         }))
         .filter((row: ResultRow) => row.issueNumber && /^[0-9]$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
-      [...apiResults, ...historyResults].forEach((row) => byIssue.set(row.issueNumber, row));
+      historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
       const loadedResults = [...byIssue.values()].sort((a, b) =>
-        Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)),
+        (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0),
       );
       setSignals(list);
       setResults(loadedResults);
