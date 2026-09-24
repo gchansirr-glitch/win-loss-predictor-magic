@@ -148,16 +148,20 @@ function Dashboard({ user }: { user: TgUser }) {
           .filter((row): row is Item => row !== null)
           .sort((a, b) => Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)));
         if (!alive) return;
-        setList(rows);
-        setError(rows.length ? null : "No data");
+        if (rows.length > 0) {
+          setList(rows);
+          setError(null);
+        }
       } catch {
         try {
           const res = await fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" });
           const json = await res.json();
           if (!alive) return;
           const rows: Item[] = json?.data?.list ?? [];
-          setList(rows);
-          setError(rows.length ? null : "No data");
+          if (rows.length > 0) {
+            setList(rows);
+            setError(null);
+          }
         } catch {
           if (alive) setError("Connection failed");
         }
@@ -272,7 +276,7 @@ function Dashboard({ user }: { user: TgUser }) {
           <>
             <VipWelcome expiresAt={access.expiresAt} />
             {tab === "signals" ? (
-              <SignalsPanel historyRows={list} />
+              <SignalsPanel historyRows={list} liveResults={list} />
             ) : (
               <section>
                 <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">

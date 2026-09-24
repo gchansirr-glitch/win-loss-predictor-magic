@@ -34,7 +34,7 @@ function timestampMs(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] }) {
+export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRows?: HistoryRow[]; liveResults?: HistoryRow[] }) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,9 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
       const snapshotHistory = snapshotsPayload && "data" in snapshotsPayload && Array.isArray(snapshotsPayload.data)
         ? snapshotsPayload.data
         : [];
-      const gameHistory = [...directHistory, ...publicHistory, ...snapshotHistory];
+      const gameHistory = liveResults.length > 0
+        ? liveResults
+        : [...directHistory, ...publicHistory, ...snapshotHistory];
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
@@ -141,16 +143,16 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
   const rows = signals.map((signal) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
-    const signalSuffixes = signalNo.length >= 4
-      ? [signalNo.slice(-4), signalNo.slice(-3)]
-      : signalNo.length === 3
-        ? [signalNo]
-        : [];
+    const latestIssue = results[0]?.issueNumber?.replace(/\D/g, "") ?? "";
+    const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 4));
+    const round = signalNo.length >= 4 ? signalNo.slice(-4) : signalNo.slice(-2).padStart(2, "0");
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
-      return Boolean(signalNo && historyNo && signalSuffixes.length) && (
-        historyNo === signalNo || signalSuffixes.some((suffix) => historyNo.endsWith(suffix))
-      );
+      const sameActiveDate = activePrefix ? historyNo.startsWith(activePrefix) : true;
+      const roundMatch = round.length === 4
+        ? historyNo.endsWith(round) || historyNo.endsWith(round.slice(-3))
+        : historyNo.endsWith(round);
+      return Boolean(historyNo && round && sameActiveDate && roundMatch);
     });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
@@ -161,13 +163,8 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     // The channel posts only the short tail (for example TRX 91). Rebuild the
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
-    const latestIssue = results[0]?.issueNumber;
-    const displaySuffix = signalSuffixes[0] || signalNo;
-    const fullPeriod =
-      matched?.issueNumber ??
-      (latestIssue && displaySuffix
-        ? latestIssue.slice(0, Math.max(0, latestIssue.length - displaySuffix.length)) + displaySuffix
-        : signal.period);
+    const displaySuffix = round;
+    const fullPeriod = matched?.issueNumber ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
     return { ...signal, num, outcome, fullPeriod };
   });
 
