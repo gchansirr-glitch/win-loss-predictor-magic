@@ -142,17 +142,15 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
   const rows = signals.map((signal) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
     const signalSuffixes = signalNo.length >= 4
-      ? [signalNo.slice(-4), signalNo.slice(-3), signalNo.slice(-2)]
-      : [signalNo];
-    const signalTime = timestampMs(signal.postedAt);
+      ? [signalNo.slice(-4), signalNo.slice(-3)]
+      : signalNo.length === 3
+        ? [signalNo]
+        : [];
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
-      const periodMatch = Boolean(signalNo && historyNo) && (
+      return Boolean(signalNo && historyNo && signalSuffixes.length) && (
         historyNo === signalNo || signalSuffixes.some((suffix) => historyNo.endsWith(suffix))
       );
-      const timeMatch = signalTime > 0 && result.blockTimestamp > 0
-        && Math.abs(signalTime - result.blockTimestamp) <= 90_000;
-      return periodMatch || timeMatch;
     });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
