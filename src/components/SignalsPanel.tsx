@@ -44,12 +44,16 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
     };
 
     const load = async () => {
-      const [signalsApiResponse, historyResponse] = await Promise.allSettled([
+      const [signalsApiResponse, historyResponse, resultsApiResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
         })),
-        withTimeout(supabase.from("game_history").select("*").limit(100)),
+        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(100)),
+        withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`results ${response.status}`);
+          return response.json();
+        })),
       ]);
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
@@ -58,9 +62,12 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const historyPayload = historyResponse.status === "fulfilled" ? historyResponse.value : null;
-      const gameHistory = historyPayload && "data" in historyPayload && Array.isArray(historyPayload.data)
+      const resultsPayload = resultsApiResponse.status === "fulfilled" ? resultsApiResponse.value : null;
+      const directHistory = historyPayload && "data" in historyPayload && Array.isArray(historyPayload.data)
         ? historyPayload.data
         : [];
+      const publicHistory = Array.isArray(resultsPayload?.data?.list) ? resultsPayload.data.list : [];
+      const gameHistory = directHistory.length ? directHistory : publicHistory;
       console.log("Game History Rows:", gameHistory);
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
@@ -84,7 +91,7 @@ export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] 
 
       const historyResults: ResultRow[] = gameHistory
         .map((row: Record<string, unknown>) => ({
-          issueNumber: String(row.issue_number ?? row.transaction_no ?? row.period ?? ""),
+          issueNumber: String(row.issue_number ?? row.issueNumber ?? row.transaction_no ?? row.period ?? ""),
           number: String(row.result_number ?? row.number ?? row.result ?? ""),
           blockTimestamp: Number(row.block_timestamp ?? 0),
         }))
