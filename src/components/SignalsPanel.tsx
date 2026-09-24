@@ -43,22 +43,31 @@ export function SignalsPanel() {
     };
 
     const load = async () => {
-      const [signalsResponse, historyResponse] = await Promise.allSettled([
-        withTimeout(supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20)),
+      const [signalsApiResponse, historyResponse] = await Promise.allSettled([
+        withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`signals ${response.status}`);
+          return response.json();
+        })),
         withTimeout(supabase.from("result_snapshots").select("*").order("captured_at", { ascending: false }).limit(50)),
       ]);
+      const directSignalsResponse = await withTimeout(
+        supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
+      ).catch(() => ({ data: [], error: null }));
       if (!alive) return;
 
-      const signalsSucceeded = signalsResponse.status === "fulfilled" && !signalsResponse.value.error;
-      const signalRows = signalsSucceeded ? signalsResponse.value.data ?? [] : null;
+      const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
+      const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
+      const directRows = directSignalsResponse.data ?? [];
+      const signalRows = apiRows ?? directRows;
       const list: Signal[] = signalRows
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
+            const normalizedDirection = direction === "B" || direction === "BIG" ? "BIG" : "SMALL";
             return {
               signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
               period: String(row.period ?? row.transaction_no ?? row.transaction_number ?? ""),
-              sourceDirection: String(row.source_direction ?? direction).toUpperCase() as Direction,
-              direction: (direction === "BIG" ? "BIG" : "SMALL") as Direction,
+              sourceDirection: String(row.source_direction ?? normalizedDirection).toUpperCase() as Direction,
+              direction: (apiRows ? normalizedDirection : normalizedDirection === "BIG" ? "SMALL" : "BIG") as Direction,
               level: Number(row.level ?? row.step ?? 1),
               sourceText: String(row.source_text ?? ""),
               postedAt: String(row.posted_at ?? row.created_at ?? ""),

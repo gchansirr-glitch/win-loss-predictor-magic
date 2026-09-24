@@ -36,7 +36,9 @@ function parse(html: string): Signal[] {
       rawDirection === "B" || rawDirection === "BIG" ? "BIG" : "SMALL";
 
     // Compare the signal with the actual BIG/SMALL result using the published direction.
-    const direction: Direction = sourceDirection;
+    // The site uses the opposite side of the Telegram signal: B -> SMALL,
+    // S -> BIG. Keep the source direction separately for auditability.
+    const direction: Direction = sourceDirection === "BIG" ? "SMALL" : "BIG";
     const level = Number(match[3] ?? 1);
     const messageEnd = html.indexOf("</div></div>", m.index);
     const messageHtml = html.slice(m.index, messageEnd === -1 ? undefined : messageEnd);
