@@ -16,12 +16,13 @@ type Signal = {
   winChance?: number | null;
 };
 type ResultRow = { issueNumber: string; number: string; blockTimestamp: number };
+type HistoryRow = { issueNumber: string; number: string; blockTimestamp: number };
 
 function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
-export function SignalsPanel() {
+export function SignalsPanel({ historyRows = [] }: { historyRows?: HistoryRow[] }) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -88,9 +89,12 @@ export function SignalsPanel() {
         : results;
       const byIssue = new Map<string, ResultRow>();
       historyResults.forEach((row) => byIssue.set(row.issueNumber, row));
-      const loadedResults = [...byIssue.values()].sort((a, b) =>
-        (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0),
-      );
+      const loadedResults = [...byIssue.values(), ...historyRows]
+        .reduce<ResultRow[]>((rows, row) => {
+          if (!rows.some((existing) => existing.issueNumber === row.issueNumber)) rows.push(row);
+          return rows;
+        }, [])
+        .sort((a, b) => (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0));
       setSignals(list);
       setResults(loadedResults);
       setError(list.length ? null : "No signals yet");

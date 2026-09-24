@@ -272,7 +272,7 @@ function Dashboard({ user }: { user: TgUser }) {
           <>
             <VipWelcome expiresAt={access.expiresAt} />
             {tab === "signals" ? (
-              <SignalsPanel />
+              <SignalsPanel historyRows={list} />
             ) : (
               <section>
                 <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">
