@@ -57,9 +57,13 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
 
     const load = async () => {
-      const [signalsApiResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
+      const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
+          return response.json();
+        })),
+        withTimeout(fetch(`https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) throw new Error(`live results ${response.status}`);
           return response.json();
         })),
         withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(100)),
@@ -75,8 +79,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       if (!alive) return;
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
+      const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
       const historyPayload = historyResponse.status === "fulfilled" ? historyResponse.value : null;
       const resultsPayload = resultsApiResponse.status === "fulfilled" ? resultsApiResponse.value : null;
+      const liveRows = Array.isArray(livePayload?.data?.list)
+        ? livePayload.data.list
+        : Array.isArray(livePayload?.list) ? livePayload.list : [];
       const snapshotsPayload = snapshotsResponse.status === "fulfilled" ? snapshotsResponse.value : null;
       const directHistory = historyPayload && "data" in historyPayload && Array.isArray(historyPayload.data)
         ? historyPayload.data
@@ -85,8 +93,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const snapshotHistory = snapshotsPayload && "data" in snapshotsPayload && Array.isArray(snapshotsPayload.data)
         ? snapshotsPayload.data
         : [];
-      const gameHistory = liveResults.length > 0
-        ? liveResults
+      const gameHistory = liveRows.length > 0
+        ? liveRows
         : [...directHistory, ...publicHistory, ...snapshotHistory];
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
@@ -144,14 +152,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const rows = signals.map((signal) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
     const latestIssue = results[0]?.issueNumber?.replace(/\D/g, "") ?? "";
-    const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 4));
-    const round = signalNo.length >= 4 ? signalNo.slice(-4) : signalNo.slice(-2).padStart(2, "0");
+    const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 2));
+    const round = signalNo.slice(-2).padStart(2, "0");
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       const sameActiveDate = activePrefix ? historyNo.startsWith(activePrefix) : true;
-      const roundMatch = round.length === 4
-        ? historyNo.endsWith(round) || historyNo.endsWith(round.slice(-3))
-        : historyNo.endsWith(round);
+      const roundMatch = historyNo.endsWith(round);
       return Boolean(historyNo && round && sameActiveDate && roundMatch);
     });
     const num = matched?.number;
