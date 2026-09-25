@@ -7,7 +7,7 @@ type Row = {
   last_seen_at: string;
 };
 
-export function AdminPanel({ adminId }: { adminId: string }) {
+export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminUsername?: string | null }) {
   const [users, setUsers] = useState<Row[]>([]);
   const [manualId, setManualId] = useState("");
   const [manualDays, setManualDays] = useState("7");
@@ -19,7 +19,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
       const response = await fetch("/api/public/vip/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminId }),
+        body: JSON.stringify({ adminId, adminUsername }),
       });
       if (!response.ok) throw new Error("Failed to load users");
       const res = await response.json();
@@ -48,7 +48,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
       const response = await fetch("/api/public/vip/set-vip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminId, telegramId, plan, days }),
+        body: JSON.stringify({ adminId, adminUsername, telegramId, plan, days }),
       });
       if (!response.ok) throw new Error("Action failed");
       setMsg(

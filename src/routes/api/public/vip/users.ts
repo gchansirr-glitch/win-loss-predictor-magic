@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const ADMIN_IDS = new Set(["5471930058", "7147520184"]);
+import { isAuthorizedAdmin } from "@/lib/admin-auth";
 
 export const Route = createFileRoute("/api/public/vip/users")({
   server: {
@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/public/vip/users")({
       POST: async ({ request }) => {
         try {
           const body = await request.json();
-          if (!ADMIN_IDS.has(String(body?.adminId ?? "").trim())) return Response.json({ error: "Forbidden" }, { status: 403 });
+          if (!isAuthorizedAdmin(body?.adminId, body?.adminUsername)) return Response.json({ error: "Forbidden" }, { status: 403 });
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data: users, error } = await supabaseAdmin.from("app_users").select("*").order("last_seen_at", { ascending: false }).limit(200);
           if (error) throw error;

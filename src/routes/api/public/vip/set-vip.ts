@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const ADMIN_IDS = new Set(["5471930058", "7147520184"]);
+import { isAuthorizedAdmin } from "@/lib/admin-auth";
 const PLANS = new Set(["1h", "1m", "days", "revoke"]);
 
 export const Route = createFileRoute("/api/public/vip/set-vip")({
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/vip/set-vip")({
           const adminId = String(body?.adminId ?? "").trim();
           const telegramId = String(body?.telegramId ?? "").trim();
           const plan = String(body?.plan ?? "");
-          if (!ADMIN_IDS.has(adminId)) return Response.json({ error: "Forbidden" }, { status: 403 });
+          if (!isAuthorizedAdmin(adminId, body?.adminUsername)) return Response.json({ error: "Forbidden" }, { status: 403 });
           if (!telegramId || !PLANS.has(plan)) return Response.json({ error: "Invalid request" }, { status: 400 });
           const dayMs = 24 * 60 * 60 * 1000;
           const days = Math.min(3650, Math.max(1, Math.floor(Number(body?.days ?? 0))));

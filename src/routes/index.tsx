@@ -274,7 +274,7 @@ function Dashboard({ user }: { user: TgUser }) {
             CHECKING ACCESS...
           </p>
         ) : tab === "admin" && isAdmin ? (
-          <AdminPanel adminId={String(user.id)} />
+          <AdminPanel adminId={String(user.id)} adminUsername={user.username} />
         ) : !isVip ? (
           <VipLocked />
         ) : (

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const ADMIN_IDS = new Set(["5471930058", "7147520184"]);
+import { isAuthorizedAdmin } from "@/lib/admin-auth";
 
 export const Route = createFileRoute("/api/public/vip/sync")({
   server: {
@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/public/vip/sync")({
           const body = await request.json();
           const telegramId = String(body?.telegramId ?? "").trim();
           if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+          const isAdmin = isAuthorizedAdmin(telegramId, body?.username);
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { error: upsertError } = await supabaseAdmin.from("app_users").upsert({
             telegram_id: telegramId,
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/api/public/vip/sync")({
           const { data: row, error } = await supabaseAdmin.from("app_users").select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
           if (error) throw error;
           const expiresAt = row?.vip_expires_at ?? null;
-          return Response.json({ isAdmin: ADMIN_IDS.has(telegramId), isVip: ADMIN_IDS.has(telegramId) || Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), expiresAt });
+          return Response.json({ isAdmin, isVip: isAdmin || Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), expiresAt });
         } catch (error) {
           console.error("[vip/sync] failed", error);
           return Response.json({ error: "Unable to sync user" }, { status: 500 });
