@@ -100,11 +100,13 @@ function Dashboard({ user }: { user: TgUser }) {
     let alive = true;
     const check = async () => {
       try {
-        const response = await fetch("/api/public/vip/sync", {
+        const response = await fetch("/api/public/vip", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            telegramId: String(user.id),
+            body: JSON.stringify({
+              action: "sync",
+              telegramId: String(user.id),
+
             username: user.username ?? null,
             firstName: user.first_name ?? null,
             photoUrl: user.photo_url ?? null,

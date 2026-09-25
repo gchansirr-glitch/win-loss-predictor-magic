@@ -16,10 +16,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`/api/public/vip/users?adminId=${encodeURIComponent(adminId)}`, {
-        method: "GET",
-        cache: "no-store",
-      });
+      const response = await fetch("/api/public/vip", { cache: "no-store" });
       const res = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(String(res.error ?? "Failed to load users"));
       setUsers(Array.isArray(res.users) ? res.users as Row[] : []);
@@ -44,10 +41,10 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
     }
     setBusy(telegramId + plan);
     try {
-      const response = await fetch("/api/public/vip/set-vip", {
+      const response = await fetch("/api/public/vip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminId, adminUsername, telegramId, plan, days }),
+        body: JSON.stringify({ action: "set_vip", telegramId, plan, days }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.ok !== true) throw new Error(String(result.error ?? "Action failed"));

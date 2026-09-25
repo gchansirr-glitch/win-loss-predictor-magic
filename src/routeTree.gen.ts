@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicResultsRouteImport } from './routes/api/public/results'
 import { Route as ApiPublicSignalsRouteImport } from './routes/api/public/signals'
+import { Route as ApiPublicVipRouteImport } from './routes/api/public/vip'
 import { Route as ApiPublicVipSetVipRouteImport } from './routes/api/public/vip/set-vip'
 import { Route as ApiPublicVipSyncRouteImport } from './routes/api/public/vip/sync'
 import { Route as ApiPublicVipUsersRouteImport } from './routes/api/public/vip/users'
@@ -31,26 +32,32 @@ const ApiPublicSignalsRoute = ApiPublicSignalsRouteImport.update({
   path: '/api/public/signals',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicVipSetVipRoute = ApiPublicVipSetVipRouteImport.update({
-  id: '/api/public/vip/set-vip',
-  path: '/api/public/vip/set-vip',
+const ApiPublicVipRoute = ApiPublicVipRouteImport.update({
+  id: '/api/public/vip',
+  path: '/api/public/vip',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicVipSetVipRoute = ApiPublicVipSetVipRouteImport.update({
+  id: '/set-vip',
+  path: '/set-vip',
+  getParentRoute: () => ApiPublicVipRoute,
 } as any)
 const ApiPublicVipSyncRoute = ApiPublicVipSyncRouteImport.update({
-  id: '/api/public/vip/sync',
-  path: '/api/public/vip/sync',
-  getParentRoute: () => rootRouteImport,
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => ApiPublicVipRoute,
 } as any)
 const ApiPublicVipUsersRoute = ApiPublicVipUsersRouteImport.update({
-  id: '/api/public/vip/users',
-  path: '/api/public/vip/users',
-  getParentRoute: () => rootRouteImport,
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => ApiPublicVipRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip': typeof ApiPublicVipRouteWithChildren
   '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
   '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
   '/api/public/vip/users': typeof ApiPublicVipUsersRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip': typeof ApiPublicVipRouteWithChildren
   '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
   '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
   '/api/public/vip/users': typeof ApiPublicVipUsersRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip': typeof ApiPublicVipRouteWithChildren
   '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
   '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
   '/api/public/vip/users': typeof ApiPublicVipUsersRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/public/results'
     | '/api/public/signals'
+    | '/api/public/vip'
     | '/api/public/vip/set-vip'
     | '/api/public/vip/sync'
     | '/api/public/vip/users'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/public/results'
     | '/api/public/signals'
+    | '/api/public/vip'
     | '/api/public/vip/set-vip'
     | '/api/public/vip/sync'
     | '/api/public/vip/users'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/public/results'
     | '/api/public/signals'
+    | '/api/public/vip'
     | '/api/public/vip/set-vip'
     | '/api/public/vip/sync'
     | '/api/public/vip/users'
@@ -103,9 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiPublicResultsRoute: typeof ApiPublicResultsRoute
   ApiPublicSignalsRoute: typeof ApiPublicSignalsRoute
-  ApiPublicVipSetVipRoute: typeof ApiPublicVipSetVipRoute
-  ApiPublicVipSyncRoute: typeof ApiPublicVipSyncRoute
-  ApiPublicVipUsersRoute: typeof ApiPublicVipUsersRoute
+  ApiPublicVipRoute: typeof ApiPublicVipRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -131,37 +141,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSignalsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/vip': {
+      id: '/api/public/vip'
+      path: '/api/public/vip'
+      fullPath: '/api/public/vip'
+      preLoaderRoute: typeof ApiPublicVipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/vip/set-vip': {
       id: '/api/public/vip/set-vip'
-      path: '/api/public/vip/set-vip'
+      path: '/set-vip'
       fullPath: '/api/public/vip/set-vip'
       preLoaderRoute: typeof ApiPublicVipSetVipRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiPublicVipRoute
     }
     '/api/public/vip/sync': {
       id: '/api/public/vip/sync'
-      path: '/api/public/vip/sync'
+      path: '/sync'
       fullPath: '/api/public/vip/sync'
       preLoaderRoute: typeof ApiPublicVipSyncRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiPublicVipRoute
     }
     '/api/public/vip/users': {
       id: '/api/public/vip/users'
-      path: '/api/public/vip/users'
+      path: '/users'
       fullPath: '/api/public/vip/users'
       preLoaderRoute: typeof ApiPublicVipUsersRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiPublicVipRoute
     }
   }
 }
+
+interface ApiPublicVipRouteChildren {
+  ApiPublicVipSetVipRoute: typeof ApiPublicVipSetVipRoute
+  ApiPublicVipSyncRoute: typeof ApiPublicVipSyncRoute
+  ApiPublicVipUsersRoute: typeof ApiPublicVipUsersRoute
+}
+
+const ApiPublicVipRouteChildren: ApiPublicVipRouteChildren = {
+  ApiPublicVipSetVipRoute: ApiPublicVipSetVipRoute,
+  ApiPublicVipSyncRoute: ApiPublicVipSyncRoute,
+  ApiPublicVipUsersRoute: ApiPublicVipUsersRoute,
+}
+
+const ApiPublicVipRouteWithChildren = ApiPublicVipRoute._addFileChildren(
+  ApiPublicVipRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiPublicResultsRoute: ApiPublicResultsRoute,
   ApiPublicSignalsRoute: ApiPublicSignalsRoute,
-  ApiPublicVipSetVipRoute: ApiPublicVipSetVipRoute,
-  ApiPublicVipSyncRoute: ApiPublicVipSyncRoute,
-  ApiPublicVipUsersRoute: ApiPublicVipUsersRoute,
+  ApiPublicVipRoute: ApiPublicVipRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
