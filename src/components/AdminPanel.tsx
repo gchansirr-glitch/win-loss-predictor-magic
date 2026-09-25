@@ -16,16 +16,15 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/public/vip/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminId, adminUsername }),
+      const response = await fetch(`/api/public/vip/users?adminId=${encodeURIComponent(adminId)}`, {
+        method: "GET",
+        cache: "no-store",
       });
-      if (!response.ok) throw new Error("Failed to load users");
-      const res = await response.json();
-      setUsers(res.users as Row[]);
-    } catch {
-      setMsg("Failed to load users");
+      const res = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(res.error ?? "Failed to load users"));
+      setUsers(Array.isArray(res.users) ? res.users as Row[] : []);
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Failed to load users");
     }
   }, [adminId, adminUsername]);
 
@@ -50,15 +49,16 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminId, adminUsername, telegramId, plan, days }),
       });
-      if (!response.ok) throw new Error("Action failed");
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) throw new Error(String(result.error ?? "Action failed"));
       setMsg(
         plan === "revoke"
           ? `Removed VIP for ${telegramId}`
           : `VIP granted (${plan === "1h" ? "1 hour" : plan === "1m" ? "1 month" : `${days} days`}) to ${telegramId}`,
       );
       await load();
-    } catch {
-      setMsg("Action failed");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Action failed");
     } finally {
       setBusy(null);
     }

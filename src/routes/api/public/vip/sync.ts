@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/public/vip/sync")({
           const { data: row, error } = await supabaseAdmin.from("app_users").select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
           if (error) throw error;
           const expiresAt = row?.vip_expires_at ?? null;
-          return Response.json({ isAdmin, isVip: isAdmin || Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), expiresAt });
+          return Response.json({ ok: true, isAdmin, isVip: isAdmin || Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), expiresAt });
         } catch (error) {
           console.error("[vip/sync] failed", error);
           return Response.json({ error: "Unable to sync user" }, { status: 500 });
