@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicResultsRouteImport } from './routes/api/public/results'
 import { Route as ApiPublicSignalsRouteImport } from './routes/api/public/signals'
+import { Route as ApiPublicVipSetVipRouteImport } from './routes/api/public/vip/set-vip'
+import { Route as ApiPublicVipSyncRouteImport } from './routes/api/public/vip/sync'
+import { Route as ApiPublicVipUsersRouteImport } from './routes/api/public/vip/users'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +31,81 @@ const ApiPublicSignalsRoute = ApiPublicSignalsRouteImport.update({
   path: '/api/public/signals',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicVipSetVipRoute = ApiPublicVipSetVipRouteImport.update({
+  id: '/api/public/vip/set-vip',
+  path: '/api/public/vip/set-vip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicVipSyncRoute = ApiPublicVipSyncRouteImport.update({
+  id: '/api/public/vip/sync',
+  path: '/api/public/vip/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicVipUsersRoute = ApiPublicVipUsersRouteImport.update({
+  id: '/api/public/vip/users',
+  path: '/api/public/vip/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
+  '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
+  '/api/public/vip/users': typeof ApiPublicVipUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
+  '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
+  '/api/public/vip/users': typeof ApiPublicVipUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/public/results': typeof ApiPublicResultsRoute
   '/api/public/signals': typeof ApiPublicSignalsRoute
+  '/api/public/vip/set-vip': typeof ApiPublicVipSetVipRoute
+  '/api/public/vip/sync': typeof ApiPublicVipSyncRoute
+  '/api/public/vip/users': typeof ApiPublicVipUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/results' | '/api/public/signals'
+  fullPaths:
+    | '/'
+    | '/api/public/results'
+    | '/api/public/signals'
+    | '/api/public/vip/set-vip'
+    | '/api/public/vip/sync'
+    | '/api/public/vip/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/results' | '/api/public/signals'
-  id: '__root__' | '/' | '/api/public/results' | '/api/public/signals'
+  to:
+    | '/'
+    | '/api/public/results'
+    | '/api/public/signals'
+    | '/api/public/vip/set-vip'
+    | '/api/public/vip/sync'
+    | '/api/public/vip/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/public/results'
+    | '/api/public/signals'
+    | '/api/public/vip/set-vip'
+    | '/api/public/vip/sync'
+    | '/api/public/vip/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiPublicResultsRoute: typeof ApiPublicResultsRoute
   ApiPublicSignalsRoute: typeof ApiPublicSignalsRoute
+  ApiPublicVipSetVipRoute: typeof ApiPublicVipSetVipRoute
+  ApiPublicVipSyncRoute: typeof ApiPublicVipSyncRoute
+  ApiPublicVipUsersRoute: typeof ApiPublicVipUsersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +131,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSignalsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/vip/set-vip': {
+      id: '/api/public/vip/set-vip'
+      path: '/api/public/vip/set-vip'
+      fullPath: '/api/public/vip/set-vip'
+      preLoaderRoute: typeof ApiPublicVipSetVipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/vip/sync': {
+      id: '/api/public/vip/sync'
+      path: '/api/public/vip/sync'
+      fullPath: '/api/public/vip/sync'
+      preLoaderRoute: typeof ApiPublicVipSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/vip/users': {
+      id: '/api/public/vip/users'
+      path: '/api/public/vip/users'
+      fullPath: '/api/public/vip/users'
+      preLoaderRoute: typeof ApiPublicVipUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +159,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiPublicResultsRoute: ApiPublicResultsRoute,
   ApiPublicSignalsRoute: ApiPublicSignalsRoute,
+  ApiPublicVipSetVipRoute: ApiPublicVipSetVipRoute,
+  ApiPublicVipSyncRoute: ApiPublicVipSyncRoute,
+  ApiPublicVipUsersRoute: ApiPublicVipUsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

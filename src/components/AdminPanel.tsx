@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { listUsers, setVip } from "@/lib/vip.functions";
-
 type Row = {
   telegram_id: string;
   username: string | null;
@@ -18,7 +16,13 @@ export function AdminPanel({ adminId }: { adminId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await listUsers(adminId);
+      const response = await fetch("/api/public/vip/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId }),
+      });
+      if (!response.ok) throw new Error("Failed to load users");
+      const res = await response.json();
       setUsers(res.users as Row[]);
     } catch {
       setMsg("Failed to load users");
@@ -41,7 +45,12 @@ export function AdminPanel({ adminId }: { adminId: string }) {
     }
     setBusy(telegramId + plan);
     try {
-      await setVip({ adminId, telegramId, plan, days });
+      const response = await fetch("/api/public/vip/set-vip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId, telegramId, plan, days }),
+      });
+      if (!response.ok) throw new Error("Action failed");
       setMsg(
         plan === "revoke"
           ? `Removed VIP for ${telegramId}`

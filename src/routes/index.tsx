@@ -5,7 +5,6 @@ import { SignalsPanel } from "@/components/SignalsPanel";
 import { AdminPanel } from "@/components/AdminPanel";
 
 import { VipLocked, VipWelcome } from "@/components/VipNotice";
-import { syncUser } from "@/lib/vip.functions";
 
 const LOGO = "https://i.ibb.co/ZRwKk7rf/IMG-20260730-162018-470.jpg";
 
@@ -97,12 +96,18 @@ function Dashboard({ user }: { user: TgUser }) {
     let alive = true;
     const check = async () => {
       try {
-        const res = await syncUser({
-          telegramId: String(user.id),
-          username: user.username ?? null,
-          firstName: user.first_name ?? null,
-          photoUrl: user.photo_url ?? null,
+        const response = await fetch("/api/public/vip/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telegramId: String(user.id),
+            username: user.username ?? null,
+            firstName: user.first_name ?? null,
+            photoUrl: user.photo_url ?? null,
+          }),
         });
+        if (!response.ok) throw new Error("VIP sync failed");
+        const res = await response.json();
         if (alive) setAccess(res);
       } catch {
         if (alive) setAccess({ isVip: false, isAdmin: false, expiresAt: null });
