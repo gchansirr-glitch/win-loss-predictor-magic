@@ -86,11 +86,15 @@ function Dashboard({ user }: { user: TgUser }) {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("signals");
+  const normalizedUsername = String(user.username ?? "").replace(/^@/, "").toLowerCase();
+  const directAdmin = normalizedUsername === "one_percent_trader_1"
+    || normalizedUsername === "thetpyinn7"
+    || ["5471930058", "7147520184"].includes(String(user.id));
   const [access, setAccess] = useState<{
     isVip: boolean;
     isAdmin: boolean;
     expiresAt: string | null;
-  } | null>(null);
+  }>({ isVip: directAdmin, isAdmin: directAdmin, expiresAt: null });
 
   useEffect(() => {
     let alive = true;
@@ -108,9 +112,9 @@ function Dashboard({ user }: { user: TgUser }) {
         });
         if (!response.ok) throw new Error("VIP sync failed");
         const res = await response.json();
-        if (alive) setAccess(res);
+        if (alive) setAccess(directAdmin ? { ...res, isVip: true, isAdmin: true } : res);
       } catch {
-        if (alive) setAccess({ isVip: false, isAdmin: false, expiresAt: null });
+        if (alive) setAccess(directAdmin ? { isVip: true, isAdmin: true, expiresAt: null } : { isVip: false, isAdmin: false, expiresAt: null });
       }
     };
     check();

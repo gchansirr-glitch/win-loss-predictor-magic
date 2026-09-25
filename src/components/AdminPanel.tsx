@@ -27,7 +27,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
     } catch {
       setMsg("Failed to load users");
     }
-  }, [adminId]);
+  }, [adminId, adminUsername]);
 
   useEffect(() => {
     void load();
