@@ -100,7 +100,7 @@ function Dashboard({ user }: { user: TgUser }) {
     let alive = true;
     const check = async () => {
       try {
-        const response = await fetch("/api/public/vip", {
+        const response = await fetch("/api/public/signals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

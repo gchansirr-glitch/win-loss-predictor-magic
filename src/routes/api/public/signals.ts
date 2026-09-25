@@ -64,6 +64,61 @@ function parse(html: string): Signal[] {
 export const Route = createFileRoute("/api/public/signals")({
   server: {
     handlers: {
+      POST: async ({ request }) => {
+        try {
+          const body = await request.json();
+          const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
+          const action = String(body?.action ?? "");
+
+          if (action === "sync") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const { error: upsertError } = await supabase.from("app_users").upsert({
+              telegram_id: telegramId,
+              username: body?.username ?? null,
+              first_name: body?.firstName ?? null,
+              photo_url: body?.photoUrl ?? null,
+              last_seen_at: new Date().toISOString(),
+            }, { onConflict: "telegram_id" });
+            if (upsertError) throw new Error(upsertError.message);
+            const { data: row, error: readError } = await supabase.from("app_users")
+              .select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            const expiresAt = row?.vip_expires_at ?? null;
+            return Response.json({ ok: true, isVip: Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), isAdmin: false, expiresAt });
+          }
+
+          if (action === "list_users") {
+            const { data: rows, error } = await supabase.from("app_users").select("*")
+              .order("last_seen_at", { ascending: false }).limit(200);
+            if (error) throw new Error(error.message);
+            return Response.json({ users: rows ?? [] });
+          }
+
+          if (action === "set_vip") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const plan = String(body?.plan ?? "");
+            let expires: string | null = null;
+            if (plan === "1h") expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+            else if (plan === "1m") expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+            else if (plan === "days") {
+              const days = Number(body?.days);
+              if (!Number.isFinite(days) || days < 1) return Response.json({ error: "Invalid days" }, { status: 400 });
+              expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+            } else if (plan !== "revoke") return Response.json({ error: "Invalid plan" }, { status: 400 });
+            const { error } = await supabase.from("app_users").upsert({
+              telegram_id: telegramId, vip_expires_at: expires, last_seen_at: new Date().toISOString(),
+            }, { onConflict: "telegram_id" });
+            if (error) throw new Error(error.message);
+            return Response.json({ ok: true, expiresAt: expires });
+          }
+
+          return Response.json({ error: "Unknown action" }, { status: 400 });
+        } catch (error) {
+          return Response.json({ error: String(error) }, { status: 500 });
+        }
+      },
       GET: async () => {
         try {
           // Server-only ingestion + reads use the service-role client, which

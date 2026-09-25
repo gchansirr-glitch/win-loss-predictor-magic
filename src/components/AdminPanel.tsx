@@ -16,7 +16,11 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/public/vip", { cache: "no-store" });
+      const response = await fetch("/api/public/signals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list_users" }),
+      });
       const res = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(String(res.error ?? "Failed to load users"));
       setUsers(Array.isArray(res.users) ? res.users as Row[] : []);
@@ -41,7 +45,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
     }
     setBusy(telegramId + plan);
     try {
-      const response = await fetch("/api/public/vip", {
+      const response = await fetch("/api/public/signals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "set_vip", telegramId, plan, days }),
