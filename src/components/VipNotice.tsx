@@ -28,7 +28,7 @@ function handleContactOwner() {
   window.location.href = tgLink;
 }
 
-export function VipLocked() {
+export function VipLocked({ onClaim, claimMessage }: { onClaim?: () => void; claimMessage?: string | null }) {
   return (
     <div className="rounded-2xl border border-gold/40 bg-surface p-4 text-center shadow-[0_0_40px_-16px_var(--gold)]">
       <img
@@ -41,6 +41,12 @@ export function VipLocked() {
         ဒီ signals တွေကို VIP member များသာ ကြည့်ရှုနိုင်ပါသည်။ VIP ရယူရန် owner ကို
         ဆက်သွယ်ပါ။
       </p>
+      {onClaim && (
+        <button type="button" onClick={onClaim} className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gold/50 px-4 py-3 text-sm font-bold text-gold">
+          Claim Daily 1 Hour Free VIP
+        </button>
+      )}
+      {claimMessage && <p className="mt-2 text-xs text-muted-foreground">{claimMessage}</p>}
       <button
         type="button"
         onClick={handleContactOwner}
@@ -62,6 +68,15 @@ export function VipLocked() {
   );
 }
 
+function remainingVipLabel(expiresAt: string | null) {
+  if (!expiresAt) return "Unlimited access";
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return "VIP access expired";
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  return `VIP (${days > 0 ? `${days}d ` : ""}${hours}h remaining — Until ${new Date(expiresAt).toLocaleDateString()})`;
+}
+
 export function VipWelcome({ expiresAt }: { expiresAt: string | null }) {
   return (
     <div className="mb-5 overflow-hidden rounded-2xl border border-gold/40 bg-surface text-center shadow-[0_0_40px_-16px_var(--gold)]">
@@ -71,9 +86,7 @@ export function VipWelcome({ expiresAt }: { expiresAt: string | null }) {
           VIP member ဖြစ်ပါပြီ — ကြိုဆိုပါတယ်!
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {expiresAt
-            ? `Access valid until ${new Date(expiresAt).toLocaleString()}`
-            : "Unlimited access"}
+          {remainingVipLabel(expiresAt)}
         </p>
       </div>
     </div>

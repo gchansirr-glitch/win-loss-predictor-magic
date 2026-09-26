@@ -95,6 +95,23 @@ export const Route = createFileRoute("/api/public/signals")({
             return Response.json({ users: rows ?? [] });
           }
 
+          if (action === "claim_daily_free") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const { data: row, error: readError } = await supabase.from("app_users")
+              .select("vip_expires_at, last_free_claim_at").eq("telegram_id", telegramId).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            const lastClaim = row?.last_free_claim_at ? new Date(row.last_free_claim_at).getTime() : 0;
+            if (lastClaim && Date.now() - lastClaim < 24 * 60 * 60 * 1000) {
+              return Response.json({ ok: false, alreadyClaimed: true, error: "You already claimed your free 1 hour for today! Come back tomorrow or upgrade to VIP." }, { status: 409 });
+            }
+            const currentExpiry = row?.vip_expires_at ? new Date(row.vip_expires_at).getTime() : 0;
+            const expires = new Date(Math.max(Date.now(), currentExpiry) + 60 * 60 * 1000).toISOString();
+            const { error } = await supabase.from("app_users").upsert({ telegram_id: telegramId, vip_expires_at: expires, last_free_claim_at: new Date().toISOString(), last_seen_at: new Date().toISOString() }, { onConflict: "telegram_id" });
+            if (error) throw new Error(error.message);
+            return Response.json({ ok: true, isVip: true, expiresAt: expires });
+          }
+
           if (action === "set_vip") {
             const telegramId = String(body?.telegramId ?? "");
             if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
@@ -105,7 +122,9 @@ export const Route = createFileRoute("/api/public/signals")({
             else if (plan === "days") {
               const days = Number(body?.days);
               if (!Number.isFinite(days) || days < 1) return Response.json({ error: "Invalid days" }, { status: 400 });
-              expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+              const { data: current } = await supabase.from("app_users").select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
+              const currentExpiry = current?.vip_expires_at ? new Date(current.vip_expires_at).getTime() : 0;
+              expires = new Date(Math.max(Date.now(), currentExpiry) + days * 24 * 60 * 60 * 1000).toISOString();
             } else if (plan !== "revoke") return Response.json({ error: "Invalid plan" }, { status: 400 });
             const { error } = await supabase.from("app_users").upsert({
               telegram_id: telegramId, vip_expires_at: expires, last_seen_at: new Date().toISOString(),

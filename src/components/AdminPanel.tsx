@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
+function remainingVipLabel(expiresAt: string | null) {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return null;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  return `VIP (${days > 0 ? `${days}d ` : ""}${hours}h remaining — Until ${new Date(expiresAt).toLocaleDateString()})`;
+}
+
+function displayName(user: Row) {
+  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return name || (user.username ? `@${user.username}` : `Telegram ID: ${user.telegram_id}`);
+}
+
 type Row = {
   telegram_id: string;
   username: string | null;
   first_name: string | null;
+  last_name?: string | null;
   vip_expires_at: string | null;
   last_seen_at: string;
 };
@@ -133,10 +148,8 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-display text-sm font-bold">
-                    {u.first_name ?? "User"}{" "}
-                    {u.username && (
-                      <span className="text-muted-foreground">@{u.username}</span>
-                    )}
+                    {displayName(u)}{" "}
+                    {u.username && <span className="text-muted-foreground">@{u.username}</span>}
                   </p>
                   <p className="font-display text-[11px] text-muted-foreground tabular-nums">
                     ID {u.telegram_id}
@@ -151,9 +164,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
                 </span>
               </div>
               {active && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Until {new Date(u.vip_expires_at as string).toLocaleString()}
-                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{remainingVipLabel(u.vip_expires_at)}</p>
               )}
               <div className="mt-3 flex gap-2">
                 <button

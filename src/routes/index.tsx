@@ -86,6 +86,7 @@ function Dashboard({ user }: { user: TgUser }) {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("signals");
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const normalizedUsername = String(user.username ?? "").replace(/^@/, "").toLowerCase();
   const directAdmin = normalizedUsername === "one_percent_trader_1"
     || normalizedUsername === "thetpyinn7"
@@ -108,8 +109,9 @@ function Dashboard({ user }: { user: TgUser }) {
               telegramId: String(user.id),
 
             username: user.username ?? null,
-            firstName: user.first_name ?? null,
-            photoUrl: user.photo_url ?? null,
+              firstName: [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || null,
+              photoUrl: user.photo_url ?? null,
+
           }),
         });
         if (!response.ok) throw new Error("VIP sync failed");
@@ -126,6 +128,19 @@ function Dashboard({ user }: { user: TgUser }) {
       clearInterval(id);
     };
   }, [user]);
+
+  const claimDailyFree = async () => {
+    setClaimMessage(null);
+    try {
+      const response = await fetch("/api/public/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "claim_daily_free", telegramId: String(user.id) }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Unable to claim free VIP");
+      setAccess((current) => ({ ...current, isVip: true, expiresAt: result.expiresAt }));
+      setClaimMessage("Free 1 hour VIP claimed successfully.");
+    } catch (error) {
+      setClaimMessage(error instanceof Error ? error.message : "Unable to claim free VIP");
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -245,7 +260,7 @@ function Dashboard({ user }: { user: TgUser }) {
               <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
             )}
             <span className="truncate text-foreground">
-              {user.username ? `@${user.username}` : (user.first_name ?? "VIP")}
+              {[user.first_name, user.last_name].filter(Boolean).join(" ").trim() || (user.username ? `@${user.username}` : `Telegram ID: ${user.id}`)}
             </span>
           </span>
         </div>
@@ -282,7 +297,7 @@ function Dashboard({ user }: { user: TgUser }) {
         ) : tab === "admin" && isAdmin ? (
           <AdminPanel adminId={String(user.id)} adminUsername={user.username} />
         ) : !isVip ? (
-          <VipLocked />
+          <VipLocked onClaim={claimDailyFree} claimMessage={claimMessage} />
         ) : (
           <>
             <VipWelcome expiresAt={access.expiresAt} />
