@@ -110,6 +110,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
+      const uniquePeriods = new Set<string>();
       const list: Signal[] = signalRows
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
 
@@ -125,7 +126,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
               winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy),
             };
-          }).filter((row) => row.period).sort((a, b) => {
+          }).filter((row) => {
+            const key = row.period.replace(/\D/g, "").slice(-2).padStart(2, "0");
+            if (!row.period || uniquePeriods.has(key)) return false;
+            uniquePeriods.add(key);
+            return true;
+          }).sort((a, b) => {
             const periodA = Number(a.period.replace(/\D/g, "")) || 0;
             const periodB = Number(b.period.replace(/\D/g, "")) || 0;
             if (periodB !== periodA) return periodB - periodA;
