@@ -206,9 +206,23 @@ export const Route = createFileRoute("/api/public/signals")({
 
           if (resultReadError) throw new Error(resultReadError.message);
 
-          const latestIssue = resultRows?.[0]?.issue_number
+          let latestIssue = resultRows?.[0]?.issue_number
             ? String(resultRows[0].issue_number)
             : null;
+          try {
+            const liveResults = await fetch("https://draw.ar-lottery01.com/TrxWinGo/TrxWinGo_1M/GetHistoryIssuePage.json?t=" + Date.now(), {
+              cache: "no-store",
+              headers: { accept: "application/json", "user-agent": "Mozilla/5.0" },
+            });
+            if (liveResults.ok) {
+              const payload = await liveResults.json() as { data?: { list?: Array<Record<string, unknown>> }; list?: Array<Record<string, unknown>> };
+              const liveList = payload.data?.list ?? payload.list ?? [];
+              const liveIssue = liveList[0]?.issueNumber ?? liveList[0]?.issue ?? liveList[0]?.period;
+              if (liveIssue != null) latestIssue = String(liveIssue).trim();
+            }
+          } catch (liveIssueError) {
+            console.error("[v0] live issue lookup unavailable:", String(liveIssueError));
+          }
           const normalizePeriod = (period: string) => {
             const raw = String(period);
             if (!latestIssue || raw.length >= latestIssue.length) return raw;
