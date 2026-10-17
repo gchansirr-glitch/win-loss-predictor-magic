@@ -112,6 +112,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const signalRows = apiRows ?? directRows;
       const list: Signal[] = signalRows
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
+
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
             const normalizedDirection = direction === "B" || direction === "BIG" ? "BIG" : "SMALL";
             return {
@@ -124,7 +125,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
               winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy),
             };
-          }).filter((row) => row.period)
+          }).filter((row) => row.period).sort((a, b) => {
+            const periodA = Number(a.period.replace(/\D/g, "")) || 0;
+            const periodB = Number(b.period.replace(/\D/g, "")) || 0;
+            if (periodB !== periodA) return periodB - periodA;
+            return (Date.parse(b.postedAt) || 0) - (Date.parse(a.postedAt) || 0);
+          })
         : signals;
 
       const historyResults: ResultRow[] = gameHistory

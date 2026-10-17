@@ -251,9 +251,12 @@ export const Route = createFileRoute("/api/public/signals")({
           // sorting numerically by period made new signals sink to the bottom
           // and the site looked frozen on an old signal.
           list.sort((a, b) => {
-            const ta = a.postedAt ? Date.parse(a.postedAt) : 0;
-            const tb = b.postedAt ? Date.parse(b.postedAt) : 0;
-            if (tb !== ta) return tb - ta;
+            const periodA = Number(String(a.period).replace(/\D/g, "")) || 0;
+            const periodB = Number(String(b.period).replace(/\D/g, "")) || 0;
+            if (periodB !== periodA) return periodB - periodA;
+            const timeA = a.postedAt ? Date.parse(a.postedAt) : 0;
+            const timeB = b.postedAt ? Date.parse(b.postedAt) : 0;
+            if (timeB !== timeA) return timeB - timeA;
             return b.capturedAt.localeCompare(a.capturedAt);
           });
 
