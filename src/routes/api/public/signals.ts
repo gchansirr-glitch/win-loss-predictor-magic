@@ -162,13 +162,7 @@ export const Route = createFileRoute("/api/public/signals")({
             });
             if (res.ok) {
               const html = await res.text();
-              const seenPeriods = new Set<string>();
-              parsed = parse(html).filter((signal) => {
-                const periodKey = String(signal.period).replace(/\D/g, "").slice(-2).padStart(2, "0");
-                if (!periodKey || seenPeriods.has(periodKey)) return false;
-                seenPeriods.add(periodKey);
-                return true;
-              });
+              parsed = parse(html);
             } else {
               console.error("[v0] signals upstream status:", res.status);
             }
@@ -233,17 +227,12 @@ export const Route = createFileRoute("/api/public/signals")({
             console.error("[v0] live issue lookup unavailable:", String(liveIssueError));
           }
           const normalizePeriod = (period: string) => {
-            const raw = String(period).replace(/\D/g, "");
+            const raw = String(period);
             if (!latestIssue || raw.length >= latestIssue.length) return raw;
-            const suffix = raw.slice(-2).padStart(2, "0");
-            const matchingIssue = (resultRows ?? []).map((row) => String(row.issue_number))
-              .find((issue) => issue.endsWith(suffix));
-            if (matchingIssue) return matchingIssue;
-            const nextIssue = String(BigInt(latestIssue) + 1n);
-            return nextIssue.endsWith(suffix) ? nextIssue : raw;
+            const prefix = latestIssue.slice(0, latestIssue.length - raw.length);
+            return `${prefix}${raw}`;
           };
 
-          const seenPeriods = new Set<string>();
           const list = (stored ?? []).map((row) => ({
             signalId: row.signal_id,
             // Telegram publishes the short round tail. Expand it to the exact
@@ -256,12 +245,7 @@ export const Route = createFileRoute("/api/public/signals")({
             sourceText: row.source_text,
             postedAt: row.posted_at,
             capturedAt: row.captured_at,
-          })).filter((row) => {
-            const key = String(row.period).replace(/\D/g, "").slice(-2).padStart(2, "0");
-            if (!row.period || seenPeriods.has(key)) return false;
-            seenPeriods.add(key);
-            return true;
-          });
+          }));
 
           // Newest post first. Periods reset (for example back to 1), so
           // sorting numerically by period made new signals sink to the bottom
