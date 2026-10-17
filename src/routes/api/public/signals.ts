@@ -36,7 +36,9 @@ function parse(html: string): Signal[] {
       rawDirection === "B" || rawDirection === "BIG" ? "BIG" : "SMALL";
 
     // Compare the signal with the actual BIG/SMALL result using the published direction.
-    const direction: Direction = sourceDirection;
+    // The site uses the opposite side of the Telegram signal: B -> SMALL,
+    // S -> BIG. Keep the source direction separately for auditability.
+    const direction: Direction = sourceDirection === "BIG" ? "SMALL" : "BIG";
     const level = Number(match[3] ?? 1);
     const messageEnd = html.indexOf("</div></div>", m.index);
     const messageHtml = html.slice(m.index, messageEnd === -1 ? undefined : messageEnd);
@@ -62,6 +64,80 @@ function parse(html: string): Signal[] {
 export const Route = createFileRoute("/api/public/signals")({
   server: {
     handlers: {
+      POST: async ({ request }) => {
+        try {
+          const body = await request.json();
+          const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
+          const action = String(body?.action ?? "");
+
+          if (action === "sync") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const { error: upsertError } = await supabase.from("app_users").upsert({
+              telegram_id: telegramId,
+              username: body?.username ?? null,
+              first_name: body?.firstName ?? null,
+              photo_url: body?.photoUrl ?? null,
+              last_seen_at: new Date().toISOString(),
+            }, { onConflict: "telegram_id" });
+            if (upsertError) throw new Error(upsertError.message);
+            const { data: row, error: readError } = await supabase.from("app_users")
+              .select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            const expiresAt = row?.vip_expires_at ?? null;
+            return Response.json({ ok: true, isVip: Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()), isAdmin: false, expiresAt });
+          }
+
+          if (action === "list_users") {
+            const { data: rows, error } = await supabase.from("app_users").select("*")
+              .order("last_seen_at", { ascending: false }).limit(200);
+            if (error) throw new Error(error.message);
+            return Response.json({ users: rows ?? [] });
+          }
+
+          if (action === "claim_daily_free") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const { data: row, error: readError } = await supabase.from("app_users")
+              .select("vip_expires_at, last_free_claim_at").eq("telegram_id", telegramId).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            const lastClaim = row?.last_free_claim_at ? new Date(row.last_free_claim_at).getTime() : 0;
+            if (lastClaim && Date.now() - lastClaim < 24 * 60 * 60 * 1000) {
+              return Response.json({ ok: false, alreadyClaimed: true, error: "You already claimed your free 1 hour for today! Come back tomorrow or upgrade to VIP." }, { status: 409 });
+            }
+            const currentExpiry = row?.vip_expires_at ? new Date(row.vip_expires_at).getTime() : 0;
+            const expires = new Date(Math.max(Date.now(), currentExpiry) + 60 * 60 * 1000).toISOString();
+            const { error } = await supabase.from("app_users").upsert({ telegram_id: telegramId, vip_expires_at: expires, last_free_claim_at: new Date().toISOString(), last_seen_at: new Date().toISOString() }, { onConflict: "telegram_id" });
+            if (error) throw new Error(error.message);
+            return Response.json({ ok: true, isVip: true, expiresAt: expires });
+          }
+
+          if (action === "set_vip") {
+            const telegramId = String(body?.telegramId ?? "");
+            if (!telegramId) return Response.json({ error: "telegramId is required" }, { status: 400 });
+            const plan = String(body?.plan ?? "");
+            let expires: string | null = null;
+            if (plan === "1h") expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+            else if (plan === "1m") expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+            else if (plan === "days") {
+              const days = Number(body?.days);
+              if (!Number.isFinite(days) || days < 1) return Response.json({ error: "Invalid days" }, { status: 400 });
+              const { data: current } = await supabase.from("app_users").select("vip_expires_at").eq("telegram_id", telegramId).maybeSingle();
+              const currentExpiry = current?.vip_expires_at ? new Date(current.vip_expires_at).getTime() : 0;
+              expires = new Date(Math.max(Date.now(), currentExpiry) + days * 24 * 60 * 60 * 1000).toISOString();
+            } else if (plan !== "revoke") return Response.json({ error: "Invalid plan" }, { status: 400 });
+            const { error } = await supabase.from("app_users").upsert({
+              telegram_id: telegramId, vip_expires_at: expires, last_seen_at: new Date().toISOString(),
+            }, { onConflict: "telegram_id" });
+            if (error) throw new Error(error.message);
+            return Response.json({ ok: true, expiresAt: expires });
+          }
+
+          return Response.json({ error: "Unknown action" }, { status: 400 });
+        } catch (error) {
+          return Response.json({ error: String(error) }, { status: 500 });
+        }
+      },
       GET: async () => {
         try {
           // Server-only ingestion + reads use the service-role client, which
@@ -122,9 +198,30 @@ export const Route = createFileRoute("/api/public/signals")({
 
           if (readError) throw new Error(readError.message);
 
+          const { data: resultRows, error: resultReadError } = await supabase
+            .from("result_snapshots")
+            .select("issue_number")
+            .order("issue_number", { ascending: false })
+            .limit(100);
+
+          if (resultReadError) throw new Error(resultReadError.message);
+
+          const latestIssue = resultRows?.[0]?.issue_number
+            ? String(resultRows[0].issue_number)
+            : null;
+          const normalizePeriod = (period: string) => {
+            const raw = String(period);
+            if (!latestIssue || raw.length >= latestIssue.length) return raw;
+            const prefix = latestIssue.slice(0, latestIssue.length - raw.length);
+            return `${prefix}${raw}`;
+          };
+
           const list = (stored ?? []).map((row) => ({
             signalId: row.signal_id,
-            period: row.period,
+            // Telegram publishes the short round tail. Expand it to the exact
+            // transaction number used by result_snapshots so settlement is an
+            // exact lookup, while an absent row remains PENDING.
+            period: normalizePeriod(String(row.period)),
             sourceDirection: row.source_direction,
             direction: row.website_direction,
             level: row.level,

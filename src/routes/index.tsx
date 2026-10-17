@@ -5,7 +5,6 @@ import { SignalsPanel } from "@/components/SignalsPanel";
 import { AdminPanel } from "@/components/AdminPanel";
 
 import { VipLocked, VipWelcome } from "@/components/VipNotice";
-import { syncUser } from "@/lib/vip.functions";
 
 const LOGO = "https://i.ibb.co/ZRwKk7rf/IMG-20260730-162018-470.jpg";
 
@@ -87,25 +86,39 @@ function Dashboard({ user }: { user: TgUser }) {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("signals");
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
+  const normalizedUsername = String(user.username ?? "").replace(/^@/, "").toLowerCase();
+  const directAdmin = normalizedUsername === "one_percent_trader_1"
+    || normalizedUsername === "thetpyinn7"
+    || ["5471930058", "7147520184"].includes(String(user.id));
   const [access, setAccess] = useState<{
     isVip: boolean;
     isAdmin: boolean;
     expiresAt: string | null;
-  } | null>(null);
+  }>({ isVip: directAdmin, isAdmin: directAdmin, expiresAt: null });
 
   useEffect(() => {
     let alive = true;
     const check = async () => {
       try {
-        const res = await syncUser({
-          telegramId: String(user.id),
-          username: user.username ?? null,
-          firstName: user.first_name ?? null,
-          photoUrl: user.photo_url ?? null,
+        const response = await fetch("/api/public/signals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "sync",
+              telegramId: String(user.id),
+
+            username: user.username ?? null,
+              firstName: [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || null,
+              photoUrl: user.photo_url ?? null,
+
+          }),
         });
-        if (alive) setAccess(res);
+        if (!response.ok) throw new Error("VIP sync failed");
+        const res = await response.json();
+        if (alive) setAccess(directAdmin ? { ...res, isVip: true, isAdmin: true } : res);
       } catch {
-        if (alive) setAccess({ isVip: false, isAdmin: false, expiresAt: null });
+        if (alive) setAccess(directAdmin ? { isVip: true, isAdmin: true, expiresAt: null } : { isVip: false, isAdmin: false, expiresAt: null });
       }
     };
     check();
@@ -115,6 +128,19 @@ function Dashboard({ user }: { user: TgUser }) {
       clearInterval(id);
     };
   }, [user]);
+
+  const claimDailyFree = async () => {
+    setClaimMessage(null);
+    try {
+      const response = await fetch("/api/public/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "claim_daily_free", telegramId: String(user.id) }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Unable to claim free VIP");
+      setAccess((current) => ({ ...current, isVip: true, expiresAt: result.expiresAt }));
+      setClaimMessage("Free 1 hour VIP claimed successfully.");
+    } catch (error) {
+      setClaimMessage(error instanceof Error ? error.message : "Unable to claim free VIP");
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -148,16 +174,20 @@ function Dashboard({ user }: { user: TgUser }) {
           .filter((row): row is Item => row !== null)
           .sort((a, b) => Number(BigInt(b.issueNumber) - BigInt(a.issueNumber)));
         if (!alive) return;
-        setList(rows);
-        setError(rows.length ? null : "No data");
+        if (rows.length > 0) {
+          setList(rows);
+          setError(null);
+        }
       } catch {
         try {
           const res = await fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" });
           const json = await res.json();
           if (!alive) return;
           const rows: Item[] = json?.data?.list ?? [];
-          setList(rows);
-          setError(rows.length ? null : "No data");
+          if (rows.length > 0) {
+            setList(rows);
+            setError(null);
+          }
         } catch {
           if (alive) setError("Connection failed");
         }
@@ -230,7 +260,7 @@ function Dashboard({ user }: { user: TgUser }) {
               <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
             )}
             <span className="truncate text-foreground">
-              {user.username ? `@${user.username}` : (user.first_name ?? "VIP")}
+              {[user.first_name, user.last_name].filter(Boolean).join(" ").trim() || (user.username ? `@${user.username}` : `Telegram ID: ${user.id}`)}
             </span>
           </span>
         </div>
@@ -265,14 +295,14 @@ function Dashboard({ user }: { user: TgUser }) {
             CHECKING ACCESS...
           </p>
         ) : tab === "admin" && isAdmin ? (
-          <AdminPanel adminId={String(user.id)} />
+          <AdminPanel adminId={String(user.id)} adminUsername={user.username} />
         ) : !isVip ? (
-          <VipLocked />
+          <VipLocked onClaim={claimDailyFree} claimMessage={claimMessage} />
         ) : (
           <>
             <VipWelcome expiresAt={access.expiresAt} />
             {tab === "signals" ? (
-              <SignalsPanel />
+              <SignalsPanel historyRows={list} liveResults={list} />
             ) : (
               <section>
                 <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">

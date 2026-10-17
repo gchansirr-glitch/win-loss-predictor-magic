@@ -1,15 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
-import { listUsers, setVip } from "@/lib/vip.functions";
+function remainingVipLabel(expiresAt: string | null) {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return null;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  return `VIP (${days > 0 ? `${days}d ` : ""}${hours}h remaining — Until ${new Date(expiresAt).toLocaleDateString()})`;
+}
+
+function displayName(user: Row) {
+  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return name || (user.username ? `@${user.username}` : `Telegram ID: ${user.telegram_id}`);
+}
 
 type Row = {
   telegram_id: string;
   username: string | null;
   first_name: string | null;
+  last_name?: string | null;
   vip_expires_at: string | null;
   last_seen_at: string;
 };
 
-export function AdminPanel({ adminId }: { adminId: string }) {
+export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminUsername?: string | null }) {
   const [users, setUsers] = useState<Row[]>([]);
   const [manualId, setManualId] = useState("");
   const [manualDays, setManualDays] = useState("7");
@@ -18,12 +31,18 @@ export function AdminPanel({ adminId }: { adminId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await listUsers(adminId);
-      setUsers(res.users as Row[]);
-    } catch {
-      setMsg("Failed to load users");
+      const response = await fetch("/api/public/signals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list_users" }),
+      });
+      const res = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(res.error ?? "Failed to load users"));
+      setUsers(Array.isArray(res.users) ? res.users as Row[] : []);
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Failed to load users");
     }
-  }, [adminId]);
+  }, [adminId, adminUsername]);
 
   useEffect(() => {
     void load();
@@ -41,15 +60,21 @@ export function AdminPanel({ adminId }: { adminId: string }) {
     }
     setBusy(telegramId + plan);
     try {
-      await setVip({ adminId, telegramId, plan, days });
+      const response = await fetch("/api/public/signals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_vip", telegramId, plan, days }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) throw new Error(String(result.error ?? "Action failed"));
       setMsg(
         plan === "revoke"
           ? `Removed VIP for ${telegramId}`
           : `VIP granted (${plan === "1h" ? "1 hour" : plan === "1m" ? "1 month" : `${days} days`}) to ${telegramId}`,
       );
       await load();
-    } catch {
-      setMsg("Action failed");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Action failed");
     } finally {
       setBusy(null);
     }
@@ -123,10 +148,8 @@ export function AdminPanel({ adminId }: { adminId: string }) {
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-display text-sm font-bold">
-                    {u.first_name ?? "User"}{" "}
-                    {u.username && (
-                      <span className="text-muted-foreground">@{u.username}</span>
-                    )}
+                    {displayName(u)}{" "}
+                    {u.username && <span className="text-muted-foreground">@{u.username}</span>}
                   </p>
                   <p className="font-display text-[11px] text-muted-foreground tabular-nums">
                     ID {u.telegram_id}
@@ -141,9 +164,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
                 </span>
               </div>
               {active && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Until {new Date(u.vip_expires_at as string).toLocaleString()}
-                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{remainingVipLabel(u.vip_expires_at)}</p>
               )}
               <div className="mt-3 flex gap-2">
                 <button
