@@ -48,6 +48,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const hasCompletedInitialLoad = useRef(false);
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +67,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
 
     const load = async () => {
+      const requestId = ++requestSequence.current;
       const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
@@ -85,7 +87,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
       ).catch(() => ({ data: [], error: null }));
-      if (!alive) return;
+      if (!alive || requestId !== requestSequence.current) return;
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
@@ -151,7 +153,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
     };
     load();
-    const id = setInterval(load, 3000);
+    const id = setInterval(load, 1500);
     return () => {
       alive = false;
       clearInterval(id);

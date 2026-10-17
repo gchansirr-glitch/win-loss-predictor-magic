@@ -151,8 +151,11 @@ export const Route = createFileRoute("/api/public/signals")({
           let parsed: Signal[] = [];
           try {
             const res = await fetch(`${CHANNEL}?t=${Date.now()}`, {
+              cache: "no-store",
               headers: {
                 accept: "text/html",
+                "cache-control": "no-cache, no-store",
+                pragma: "no-cache",
                 "user-agent":
                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
               },
