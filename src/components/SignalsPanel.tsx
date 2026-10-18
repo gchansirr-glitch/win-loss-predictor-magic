@@ -47,6 +47,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [signalType, setSignalType] = useState<"trx" | "trade-x">("trx");
   const hasCompletedInitialLoad = useRef(false);
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
+      const uniquePeriods = new Set<string>();
       const list: Signal[] = signalRows
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
@@ -122,7 +124,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
               winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy),
             };
-          }).filter((row) => row.period)
+          }).filter((row) => {
+            const key = row.period.slice(-2).padStart(2, "0");
+            if (!row.period || uniquePeriods.has(key)) return false;
+            uniquePeriods.add(key);
+            return true;
+          })
         : signals;
 
       const historyResults: ResultRow[] = gameHistory
@@ -193,10 +200,12 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
 
   return (
     <section>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">
-          VIP Signals
-        </h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">VIP Signals</h2>
+        <div className="flex rounded-lg border border-gold/30 bg-surface p-1 text-[10px] font-bold uppercase tracking-wider">
+          <button type="button" onClick={() => setSignalType("trx")} className={`rounded px-2 py-1 ${signalType === "trx" ? "bg-gold text-background" : "text-muted-foreground"}`}>TRX signals</button>
+          <button type="button" disabled className="cursor-not-allowed rounded px-2 py-1 text-muted-foreground opacity-60" title="TRADE X signals are not available yet">TRADE X signals · Locked</button>
+        </div>
       </div>
 
       {latest ? (
