@@ -49,6 +49,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [error, setError] = useState<string | null>(null);
   const [signalType, setSignalType] = useState<"trx" | "trade-x">("trx");
   const hasCompletedInitialLoad = useRef(false);
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +68,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
 
     const load = async () => {
+      const requestId = ++requestSequence.current;
       const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
@@ -86,7 +88,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
       ).catch(() => ({ data: [], error: null }));
-      if (!alive) return;
+      if (!alive || requestId !== requestSequence.current) return;
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
@@ -158,7 +160,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
     };
     load();
-    const id = setInterval(load, 3000);
+    const id = setInterval(load, 750);
     return () => {
       alive = false;
       clearInterval(id);
@@ -170,6 +172,14 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const latestIssue = results[0]?.issueNumber?.replace(/\D/g, "") ?? "";
     const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 2));
     const round = signalNo.slice(-2).padStart(2, "0");
+    const latestRound = latestIssue.slice(-2).padStart(2, "0");
+    const roundNumber = Number(round);
+    const latestRoundNumber = Number(latestRound);
+    const isUpcomingRound = latestIssue && (
+      roundNumber === latestRoundNumber + 1 ||
+      (latestRoundNumber === 99 && roundNumber === 0)
+    );
+    const upcomingIssue = isUpcomingRound ? String(BigInt(latestIssue) + 1n) : "";
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       const sameActiveDate = activePrefix ? historyNo.startsWith(activePrefix) : true;
@@ -179,14 +189,24 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const prediction = String(signal.direction ?? "").toUpperCase();
-    const outcome = matched && num != null && num !== ""
-      ? actual === prediction ? "WIN" : "LOSS"
-      : "PENDING";
+    const signalPostedAt = Date.parse(signal.postedAt);
+    const latestSettledAt = results[0]?.blockTimestamp ?? 0;
+    const secondsIntoPeriod = signalPostedAt > latestSettledAt
+      ? (signalPostedAt - latestSettledAt) / 1000
+      : 0;
+    const arrivedTooLate = Boolean(
+      signalPostedAt && latestSettledAt && secondsIntoPeriod >= 55 && secondsIntoPeriod <= 90,
+    );
+    const outcome = arrivedTooLate
+      ? "MISSING"
+      : matched && num != null && num !== ""
+        ? actual === prediction ? "WIN" : "LOSS"
+        : "PENDING";
     // The channel posts only the short tail (for example TRX 91). Rebuild the
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
     const displaySuffix = round;
-    const fullPeriod = matched?.issueNumber ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
+    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
     return { ...signal, num, outcome, fullPeriod };
   });
 
@@ -273,14 +293,16 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 <td className="whitespace-nowrap px-2 py-3 text-right">
                   <span
                     className={`inline-block rounded-md px-2 py-1 font-display text-[11px] font-bold ${
-                      r.outcome === "WIN"
-                        ? "bg-emerald-500 text-background"
-                        : r.outcome === "LOSS"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-pending text-pending-foreground"
+                  r.outcome === "WIN"
+                    ? "bg-emerald-500 text-background"
+                    : r.outcome === "LOSS"
+                      ? "bg-primary text-primary-foreground"
+                      : r.outcome === "MISSING"
+                        ? "bg-slate-600 text-white"
+                        : "bg-pending text-pending-foreground"
                     }`}
                   >
-                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" ? `(${r.num})` : ""}
+                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" && r.outcome !== "MISSING" ? `(${r.num})` : ""}
                   </span>
                 </td>
               </tr>
