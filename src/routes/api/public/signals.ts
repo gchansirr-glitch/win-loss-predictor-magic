@@ -151,6 +151,7 @@ export const Route = createFileRoute("/api/public/signals")({
           let parsed: Signal[] = [];
           try {
             const res = await fetch(`${CHANNEL}?t=${Date.now()}`, {
+              cache: "no-store",
               headers: {
                 accept: "text/html",
                 "user-agent":
@@ -206,22 +207,12 @@ export const Route = createFileRoute("/api/public/signals")({
 
           if (resultReadError) throw new Error(resultReadError.message);
 
-          const latestIssue = resultRows?.[0]?.issue_number
-            ? String(resultRows[0].issue_number)
-            : null;
-          const normalizePeriod = (period: string) => {
-            const raw = String(period);
-            if (!latestIssue || raw.length >= latestIssue.length) return raw;
-            const prefix = latestIssue.slice(0, latestIssue.length - raw.length);
-            return `${prefix}${raw}`;
-          };
-
           const list = (stored ?? []).map((row) => ({
             signalId: row.signal_id,
             // Telegram publishes the short round tail. Expand it to the exact
             // transaction number used by result_snapshots so settlement is an
             // exact lookup, while an absent row remains PENDING.
-            period: normalizePeriod(String(row.period)),
+            period: String(row.period).replace(/\D/g, ""),
             sourceDirection: row.source_direction,
             direction: row.website_direction,
             level: row.level,
@@ -230,17 +221,23 @@ export const Route = createFileRoute("/api/public/signals")({
             capturedAt: row.captured_at,
           }));
 
-          // Newest post first. Periods reset (for example back to 1), so
-          // sorting numerically by period made new signals sink to the bottom
-          // and the site looked frozen on an old signal.
-          list.sort((a, b) => {
+          const unique = new Map<string, (typeof list)[number]>();
+          for (const signal of list) {
+            const key = signal.period.slice(-2).padStart(2, "0");
+            if (!key || unique.has(key)) continue;
+            unique.set(key, signal);
+          }
+          const dedupedList = [...unique.values()];
+
+          // Telegram page order is the source of truth for the newest post.
+          dedupedList.sort((a, b) => {
             const ta = a.postedAt ? Date.parse(a.postedAt) : 0;
             const tb = b.postedAt ? Date.parse(b.postedAt) : 0;
             if (tb !== ta) return tb - ta;
             return b.capturedAt.localeCompare(a.capturedAt);
           });
 
-          return new Response(JSON.stringify({ list }), {
+          return new Response(JSON.stringify({ list: dedupedList }), {
             headers: { "content-type": "application/json", "cache-control": "no-store" },
           });
         } catch (e) {
