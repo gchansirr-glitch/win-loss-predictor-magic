@@ -186,7 +186,7 @@ export const Route = createFileRoute("/api/public/signals")({
                 { onConflict: "signal_id" },
               );
 
-            if (insertError) throw new Error(insertError.message);
+            if (insertError) console.error("[v0] signal snapshot upsert failed:", insertError.message);
           }
 
           const { data: stored, error: readError } = await supabase
@@ -207,7 +207,7 @@ export const Route = createFileRoute("/api/public/signals")({
 
           if (resultReadError) throw new Error(resultReadError.message);
 
-          const list = (stored ?? []).map((row) => ({
+          const list = (parsed.length ? parsed : (stored ?? []).map((row) => ({
             signalId: row.signal_id,
             // Telegram publishes the short round tail. Expand it to the exact
             // transaction number used by result_snapshots so settlement is an
@@ -219,7 +219,7 @@ export const Route = createFileRoute("/api/public/signals")({
             sourceText: row.source_text,
             postedAt: row.posted_at,
             capturedAt: row.captured_at,
-          }));
+          })));
 
           const unique = new Map<string, (typeof list)[number]>();
           for (const signal of list) {

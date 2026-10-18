@@ -49,6 +49,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [error, setError] = useState<string | null>(null);
   const [signalType, setSignalType] = useState<"trx" | "trade-x">("trx");
   const hasCompletedInitialLoad = useRef(false);
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +68,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
 
     const load = async () => {
+      const requestId = ++requestSequence.current;
       const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
@@ -86,7 +88,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
       ).catch(() => ({ data: [], error: null }));
-      if (!alive) return;
+      if (!alive || requestId !== requestSequence.current) return;
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
