@@ -172,6 +172,14 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const latestIssue = results[0]?.issueNumber?.replace(/\D/g, "") ?? "";
     const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 2));
     const round = signalNo.slice(-2).padStart(2, "0");
+    const latestRound = latestIssue.slice(-2).padStart(2, "0");
+    const roundNumber = Number(round);
+    const latestRoundNumber = Number(latestRound);
+    const isUpcomingRound = latestIssue && (
+      roundNumber === latestRoundNumber + 1 ||
+      (latestRoundNumber === 99 && roundNumber === 0)
+    );
+    const upcomingIssue = isUpcomingRound ? String(BigInt(latestIssue) + 1n) : "";
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       const sameActiveDate = activePrefix ? historyNo.startsWith(activePrefix) : true;
@@ -188,7 +196,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
     const displaySuffix = round;
-    const fullPeriod = matched?.issueNumber ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
+    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
     return { ...signal, num, outcome, fullPeriod };
   });
 
