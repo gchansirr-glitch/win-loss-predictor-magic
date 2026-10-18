@@ -160,7 +160,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
     };
     load();
-    const id = setInterval(load, 3000);
+    const id = setInterval(load, 750);
     return () => {
       alive = false;
       clearInterval(id);
@@ -189,9 +189,19 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
     const prediction = String(signal.direction ?? "").toUpperCase();
-    const outcome = matched && num != null && num !== ""
-      ? actual === prediction ? "WIN" : "LOSS"
-      : "PENDING";
+    const signalPostedAt = Date.parse(signal.postedAt);
+    const latestSettledAt = results[0]?.blockTimestamp ?? 0;
+    const secondsIntoPeriod = signalPostedAt > latestSettledAt
+      ? (signalPostedAt - latestSettledAt) / 1000
+      : 0;
+    const arrivedTooLate = Boolean(
+      signalPostedAt && latestSettledAt && secondsIntoPeriod >= 55 && secondsIntoPeriod <= 90,
+    );
+    const outcome = arrivedTooLate
+      ? "MISSING"
+      : matched && num != null && num !== ""
+        ? actual === prediction ? "WIN" : "LOSS"
+        : "PENDING";
     // The channel posts only the short tail (for example TRX 91). Rebuild the
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
@@ -283,14 +293,16 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 <td className="whitespace-nowrap px-2 py-3 text-right">
                   <span
                     className={`inline-block rounded-md px-2 py-1 font-display text-[11px] font-bold ${
-                      r.outcome === "WIN"
-                        ? "bg-emerald-500 text-background"
-                        : r.outcome === "LOSS"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-pending text-pending-foreground"
+                  r.outcome === "WIN"
+                    ? "bg-emerald-500 text-background"
+                    : r.outcome === "LOSS"
+                      ? "bg-primary text-primary-foreground"
+                      : r.outcome === "MISSING"
+                        ? "bg-slate-600 text-white"
+                        : "bg-pending text-pending-foreground"
                     }`}
                   >
-                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" ? `(${r.num})` : ""}
+                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" && r.outcome !== "MISSING" ? `(${r.num})` : ""}
                   </span>
                 </td>
               </tr>
