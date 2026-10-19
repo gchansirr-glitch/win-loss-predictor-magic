@@ -129,6 +129,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               winChance: Number(row.win_chance ?? row.win_rate ?? row.accuracy),
             };
           }).filter((row) => {
+            if (!/^\d+$/.test(row.period)) return false;
             const key = row.period.slice(-2).padStart(2, "0");
             if (!row.period || uniquePeriods.has(key)) return false;
             uniquePeriods.add(key);
@@ -256,7 +257,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
     const displaySuffix = round;
-    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? (activePrefix ? `${activePrefix}${displaySuffix}` : signal.period);
+    const fallbackPeriod = signalNo || (latestIssue ? String(BigInt(latestIssue) + 1n) : String(Date.now()));
+    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? (activePrefix ? `${activePrefix}${displaySuffix}` : fallbackPeriod);
     return { ...signal, num, outcome, fullPeriod };
   });
 
