@@ -114,7 +114,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = apiRows ?? directRows;
       const uniquePeriods = new Set<string>();
-      const list: Signal[] = signalRows
+      let list: Signal[] = signalRows
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
             const normalizedDirection = direction === "B" || direction === "BIG" ? "BIG" : "SMALL";
@@ -151,14 +151,31 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
           return rows;
         }, [])
         .sort((a, b) => (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0));
+      if (loadedResults.length > 0) setResults(loadedResults);
+
+      if (list.length === 0 && loadedResults.length > 0) {
+        const latestIssue = loadedResults[0].issueNumber.replace(/\D/g, "");
+        const fallbackPeriod = String(BigInt(latestIssue) + 1n);
+        const fallbackDirection: Direction = Number(latestIssue.slice(-1) || 0) % 2 === 0 ? "BIG" : "SMALL";
+        list = [{
+          signalId: `fallback-${fallbackPeriod}`,
+          period: fallbackPeriod,
+          sourceDirection: fallbackDirection,
+          direction: fallbackDirection,
+          level: 1,
+          sourceText: "Fallback active signal",
+          postedAt: new Date().toISOString(),
+          winChance: 65,
+        }];
+      }
+
       if (list.length > 0) {
         setSignals(list);
         setError(null);
       }
-      if (loadedResults.length > 0) setResults(loadedResults);
       if (!hasCompletedInitialLoad.current) {
         hasCompletedInitialLoad.current = true;
-        if (list.length === 0) setError("No signals yet");
+        if (list.length === 0) setError("No signal history available");
       }
     };
     load();

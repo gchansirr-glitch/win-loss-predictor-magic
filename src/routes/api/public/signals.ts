@@ -21,13 +21,16 @@ function parse(html: string): Signal[] {
     const text = (m[1] ?? "")
       .replace(/<br\s*\/?>/gi, " ")
       .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
       .replace(/\s+/g, " ")
       .trim();
 
     // Formula 1 posts use formats such as:
     // "TRX 64 B 300" or "TRX 64 BIG 300".
-    const match = text.match(/\bTRX\s*[-:#]?\s*(\d{1,30})\s+(B|S|BIG|SMALL)\b(?:\s+(\d+))?/i);
+    const match = text.match(/(?:^|\b)(?:FORMULA\s*1\s*)?TRX\s*[-:#]?\s*(\d{1,30})\s*(B|S|BIG|SMALL)\b(?:\s+(\d+))?/i);
     if (!match) continue;
 
     const period = match[1] ?? "";
