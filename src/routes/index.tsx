@@ -183,7 +183,9 @@ function Dashboard({ user }: { user: TgUser }) {
           const res = await fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" });
           const json = await res.json();
           if (!alive) return;
-          const rows: Item[] = json?.data?.list ?? [];
+          const rows: Item[] = Array.isArray(json?.data?.list)
+            ? json.data.list
+            : Array.isArray(json?.list) ? json.list : [];
           if (rows.length > 0) {
             setList(rows);
             setError(null);
