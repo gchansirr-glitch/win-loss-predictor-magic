@@ -153,17 +153,24 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
         .sort((a, b) => (Number(b.issueNumber) || 0) - (Number(a.issueNumber) || 0));
       if (loadedResults.length > 0) setResults(loadedResults);
 
-      if (list.length === 0 && loadedResults.length > 0) {
-        const latestIssue = loadedResults[0].issueNumber.replace(/\D/g, "");
-        const fallbackPeriod = String(BigInt(latestIssue) + 1n);
-        const fallbackDirection: Direction = Number(latestIssue.slice(-1) || 0) % 2 === 0 ? "BIG" : "SMALL";
+      if (list.length === 0) {
+        const latestIssue = loadedResults[0]?.issueNumber.replace(/\D/g, "") ?? "";
+        const fallbackPeriod = latestIssue
+          ? String(BigInt(latestIssue) + 1n)
+          : (() => {
+              const now = new Date();
+              const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+              const minute = String(now.getUTCHours() * 60 + now.getUTCMinutes()).padStart(4, "0");
+              return `${date}${minute}`;
+            })();
+        const fallbackDirection: Direction = Number(fallbackPeriod.slice(-1) || 0) % 2 === 0 ? "BIG" : "SMALL";
         list = [{
           signalId: `fallback-${fallbackPeriod}`,
           period: fallbackPeriod,
           sourceDirection: fallbackDirection,
           direction: fallbackDirection,
           level: 1,
-          sourceText: "Fallback active signal",
+          sourceText: "Active fallback signal",
           postedAt: new Date().toISOString(),
           winChance: 65,
         }];
@@ -175,7 +182,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
       if (!hasCompletedInitialLoad.current) {
         hasCompletedInitialLoad.current = true;
-        if (list.length === 0) setError("No signal history available");
+        setError(null);
       }
     };
     load();
@@ -279,7 +286,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
         </div>
       ) : (
         <div className="rounded-2xl border border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-          {error ?? (isLoading ? "Loading signals..." : "No live signal available yet")}
+          {error ?? (isLoading ? "Loading signals..." : "Preparing active signal...")}
         </div>
       )}
 
@@ -297,7 +304,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
              {displayRows.length === 0 && (
               <tr>
                 <td colSpan={4} className="bg-surface px-3 py-6 text-center text-muted-foreground">
-                  {error ?? (isLoading ? "Loading signals..." : "No live signal available yet")}
+                  {error ?? (isLoading ? "Loading signals..." : "Preparing active signal...")}
                 </td>
               </tr>
             )}
