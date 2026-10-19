@@ -150,7 +150,10 @@ export const Route = createFileRoute("/api/public/signals")({
           // down the whole endpoint: fall back to the signals already stored.
           let parsed: Signal[] = [];
           try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 1800);
             const res = await fetch(`${CHANNEL}?t=${Date.now()}`, {
+              signal: controller.signal,
               cache: "no-store",
               headers: {
                 accept: "text/html",
@@ -164,6 +167,7 @@ export const Route = createFileRoute("/api/public/signals")({
             } else {
               console.error("[v0] signals upstream status:", res.status);
             }
+            clearTimeout(timeout);
           } catch (upstreamError) {
             console.error("[v0] signals upstream unavailable:", String(upstreamError));
           }

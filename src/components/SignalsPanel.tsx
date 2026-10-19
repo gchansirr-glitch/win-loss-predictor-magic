@@ -48,6 +48,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [signalType, setSignalType] = useState<"trx" | "trade-x">("trx");
+  const [isLoading, setIsLoading] = useState(true);
   const hasCompletedInitialLoad = useRef(false);
   const requestSequence = useRef(0);
 
@@ -89,6 +90,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
       ).catch(() => ({ data: [], error: null }));
       if (!alive || requestId !== requestSequence.current) return;
+      setIsLoading(false);
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
@@ -160,9 +162,17 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
     };
     load();
+    const failsafe = setTimeout(() => {
+      if (alive && !hasCompletedInitialLoad.current) {
+        hasCompletedInitialLoad.current = true;
+        setIsLoading(false);
+        setError("No live signal available yet");
+      }
+    }, 3500);
     const id = setInterval(load, 750);
     return () => {
       alive = false;
+      clearTimeout(failsafe);
       clearInterval(id);
     };
   }, []);
@@ -252,7 +262,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
         </div>
       ) : (
         <div className="rounded-2xl border border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-          {error ?? "Loading signals..."}
+          {error ?? (isLoading ? "Loading signals..." : "No live signal available yet")}
         </div>
       )}
 
@@ -270,7 +280,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
              {displayRows.length === 0 && (
               <tr>
                 <td colSpan={4} className="bg-surface px-3 py-6 text-center text-muted-foreground">
-                  {error ?? "Loading signals..."}
+                  {error ?? (isLoading ? "Loading signals..." : "No live signal available yet")}
                 </td>
               </tr>
             )}
