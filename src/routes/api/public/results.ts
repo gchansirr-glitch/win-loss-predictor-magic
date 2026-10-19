@@ -70,10 +70,13 @@ async function fetchTelegramResults(): Promise<ResultRow[]> {
     const text = (match[1] ?? "")
       .replace(/<br\s*\/?\s*>/gi, " ")
       .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
       .replace(/\s+/g, " ")
       .trim();
-    const result = text.match(/\b(\d{8,30})\s+(BIG|SMALL|B|S)\s*\((\d)\)/i);
+    const result = text.match(/(?:^|\s)(\d{8,30})\s+(BIG|SMALL|B|S)\s*\(?([0-9])\)?/i);
     if (!result) continue;
     const time = html.slice(match.index, match.index + 1800).match(/<time\s+datetime="([^"]+)"/i)?.[1];
     rows.push({

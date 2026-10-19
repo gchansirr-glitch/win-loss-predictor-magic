@@ -233,9 +233,10 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const upcomingIssue = isUpcomingRound ? String(BigInt(latestIssue) + 1n) : "";
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
-      const sameActiveDate = activePrefix ? historyNo.startsWith(activePrefix) : true;
-      const roundMatch = historyNo.endsWith(round);
-      return Boolean(historyNo && round && sameActiveDate && roundMatch);
+      return Boolean(historyNo && signalNo && historyNo === signalNo);
+    }) ?? results.find((result) => {
+      const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
+      return Boolean(historyNo && round && historyNo.endsWith(round));
     });
     const num = matched?.number;
     const actual = num == null ? null : dirOf(num);
@@ -258,7 +259,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     // round has settled, otherwise the current day's prefix plus the tail.
     const displaySuffix = round;
     const fallbackPeriod = signalNo || (latestIssue ? String(BigInt(latestIssue) + 1n) : String(Date.now()));
-    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? (activePrefix ? `${activePrefix}${displaySuffix}` : fallbackPeriod);
+    const derivedPeriod = activePrefix && round ? `${activePrefix}${displaySuffix}` : fallbackPeriod;
+    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? derivedPeriod;
     return { ...signal, num, outcome, fullPeriod };
   });
 
