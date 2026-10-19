@@ -260,8 +260,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     const displaySuffix = round;
     const fallbackPeriod = signalNo || (latestIssue ? String(BigInt(latestIssue) + 1n) : String(Date.now()));
     const derivedPeriod = activePrefix && round ? `${activePrefix}${displaySuffix}` : fallbackPeriod;
-    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? derivedPeriod;
-    return { ...signal, num, outcome, fullPeriod };
+    const fullPeriod = String(matched?.issueNumber ?? upcomingIssue ?? derivedPeriod ?? signal.period ?? signal.signalId ?? "").trim();
+    return { ...signal, num, outcome, fullPeriod: fullPeriod || signal.period || signal.signalId };
   });
 
   const withChance = rows.map((row, index) => ({
