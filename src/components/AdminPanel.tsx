@@ -82,11 +82,11 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
 
   return (
     <section>
-      <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">
+      <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-primary">
         Admin Panel
       </h2>
 
-      <div className="rounded-xl border border-gold/40 bg-surface p-4">
+      <div className="rounded-xl border border-primary/30 bg-surface p-4">
         <p className="font-display text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
           Grant by Telegram ID
         </p>
@@ -96,7 +96,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
             onChange={(e) => setManualId(e.target.value.trim())}
             inputMode="numeric"
             placeholder="e.g. 5471930058"
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-display text-sm outline-none focus:border-gold"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-display text-sm outline-none focus:border-primary"
           />
           <button
             onClick={() => apply(manualId, "1h")}
@@ -106,7 +106,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
           </button>
           <button
             onClick={() => apply(manualId, "1m")}
-            className="rounded-lg bg-gold px-3 py-2 font-display text-xs font-bold text-background"
+            className="rounded-lg bg-primary px-3 py-2 font-display text-xs font-bold text-primary-foreground"
           >
             1 Month
           </button>
@@ -121,12 +121,12 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
             onChange={(e) => setManualDays(e.target.value.replace(/[^0-9]/g, ""))}
             inputMode="numeric"
             placeholder="Days e.g. 7"
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-display text-sm outline-none focus:border-gold"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-display text-sm outline-none focus:border-primary"
           />
           <button
             onClick={() => apply(manualId, "days", Number(manualDays))}
             disabled={busy === manualId + "days"}
-            className="rounded-lg bg-gold px-3 py-2 font-display text-xs font-bold text-background disabled:opacity-50"
+            className="rounded-lg bg-primary px-3 py-2 font-display text-xs font-bold text-primary-foreground disabled:opacity-50"
           >
             Grant Days
           </button>
@@ -157,7 +157,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
                 </div>
                 <span
                   className={`shrink-0 rounded-md px-2 py-1 font-display text-[10px] font-bold uppercase ${
-                    active ? "bg-emerald-500 text-background" : "bg-primary text-primary-foreground"
+                    active ? "bg-primary text-primary-foreground" : "bg-surface-2 text-foreground"
                   }`}
                 >
                   {active ? "VIP" : "Free"}
@@ -177,7 +177,7 @@ export function AdminPanel({ adminId, adminUsername }: { adminId: string; adminU
                 <button
                   disabled={busy === u.telegram_id + "1m"}
                   onClick={() => apply(u.telegram_id, "1m")}
-                  className="flex-1 rounded-lg bg-gold px-2 py-2 font-display text-xs font-bold text-background disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-primary px-2 py-2 font-display text-xs font-bold text-primary-foreground disabled:opacity-50"
                 >
                   1 Month
                 </button>

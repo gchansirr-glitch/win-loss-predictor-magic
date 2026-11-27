@@ -73,13 +73,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Dr Thet Pyinn VIP Signals" },
+      { title: "AutoYield" },
       {
         name: "description",
-        content: "Live results, current period, countdown timer and VIP signals from Dr Thet Pyinn VIP Signals.",
+        content: "Live results, current period, countdown timer and VIP signals from AutoYield.",
       },
-      { name: "author", content: "Dr Thet Pyinn VIP Signals" },
-      { property: "og:title", content: "Dr Thet Pyinn VIP Signals" },
+      { name: "author", content: "AutoYield" },
+      { property: "og:title", content: "AutoYield" },
       {
         property: "og:description",
         content: "Live period, countdown, VIP signals and game history feed.",
@@ -98,7 +98,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700;900&family=Padauk:wght@400;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "https://i.ibb.co/Q1wQmwH/Gemini-Generated-Image-f2xya3f2xya3f2xy.jpg", type: "image/jpeg" },
     ],
   }),
   shellComponent: RootShell,
