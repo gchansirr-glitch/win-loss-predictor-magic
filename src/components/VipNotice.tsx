@@ -30,19 +30,19 @@ function handleContactOwner() {
 
 export function VipLocked({ onClaim, claimMessage }: { onClaim?: () => void; claimMessage?: string | null }) {
   return (
-    <div className="rounded-2xl border border-gold/40 bg-surface p-4 text-center shadow-[0_0_40px_-16px_var(--gold)]">
+    <div className="rounded-2xl border border-primary/30 bg-surface p-4 text-center shadow-[0_0_40px_-16px_rgba(255,85,0,0.3)]">
       <img
         src={LOCK_IMG}
         alt="VIP members only"
         className="mx-auto w-full rounded-xl object-cover"
       />
-      <h2 className="mt-4 font-display text-lg font-bold text-gold">VIP Members Only</h2>
+      <h2 className="mt-4 font-display text-lg font-bold text-primary">VIP Members Only</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         ဒီ signals တွေကို VIP member များသာ ကြည့်ရှုနိုင်ပါသည်။ VIP ရယူရန် owner ကို
         ဆက်သွယ်ပါ။
       </p>
       {onClaim && (
-        <button type="button" onClick={onClaim} className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gold/50 px-4 py-3 text-sm font-bold text-gold">
+        <button type="button" onClick={onClaim} className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-primary/30 px-4 py-3 text-sm font-bold text-primary">
           Claim Daily 1 Hour Free VIP
         </button>
       )}
@@ -79,10 +79,10 @@ function remainingVipLabel(expiresAt: string | null) {
 
 export function VipWelcome({ expiresAt }: { expiresAt: string | null }) {
   return (
-    <div className="mb-5 overflow-hidden rounded-2xl border border-gold/40 bg-surface text-center shadow-[0_0_40px_-16px_var(--gold)]">
+    <div className="mb-5 overflow-hidden rounded-2xl border border-primary/30 bg-surface text-center shadow-[0_0_40px_-16px_rgba(255,85,0,0.3)]">
       <img src={WELCOME_IMG} alt="VIP member welcome" className="w-full object-cover" />
       <div className="px-4 py-3">
-        <p className="font-display text-sm font-bold text-gold">
+        <p className="font-display text-sm font-bold text-primary">
           VIP member ဖြစ်ပါပြီ — ကြိုဆိုပါတယ်!
         </p>
         <p className="mt-1 text-xs text-muted-foreground">

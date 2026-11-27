@@ -275,15 +275,15 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">VIP Signals</h2>
-        <div className="flex rounded-lg border border-gold/30 bg-surface p-1 text-[10px] font-bold uppercase tracking-wider">
-          <button type="button" onClick={() => setSignalType("trx")} className={`rounded px-2 py-1 ${signalType === "trx" ? "bg-gold text-background" : "text-muted-foreground"}`}>TRX signals</button>
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-primary">VIP Signals</h2>
+        <div className="flex rounded-lg border border-primary/30 bg-surface p-1 text-[10px] font-bold uppercase tracking-wider">
+          <button type="button" onClick={() => setSignalType("trx")} className={`rounded px-2 py-1 ${signalType === "trx" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>TRX signals</button>
           <button type="button" disabled className="cursor-not-allowed rounded px-2 py-1 text-muted-foreground opacity-60" title="TRADE X signals are not available yet">TRADE X signals · Locked</button>
         </div>
       </div>
 
       {latest ? (
-        <div className="overflow-hidden rounded-2xl border border-gold/40 bg-surface shadow-[0_0_40px_-16px_var(--gold)]">
+        <div className="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-[0_0_40px_-16px_rgba(255,85,0,0.3)]">
           <img
              src={latest.direction === "BIG" ? BIG_IMG : SMALL_IMG}
              alt={`${latest.direction} signal`}
@@ -295,11 +295,11 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 Transaction no
               </p>
                <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
-               <p className="mt-1 text-[11px] font-bold text-emerald-400">
+               <p className="mt-1 text-[11px] font-bold text-primary">
                  Win chance: {latest.winChance}%
                </p>
             </div>
-             <span className="rounded-md bg-gold px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-background">
+             <span className="rounded-md bg-primary px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest text-primary-foreground">
                {latest.direction}
             </span>
           </div>
@@ -331,7 +331,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               {displayRows.map((r) => (
                <tr key={r.signalId} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
-                 <td className="px-2 py-3 text-center font-display text-xs font-bold text-emerald-400 tabular-nums">
+                 <td className="px-2 py-3 text-center font-display text-xs font-bold text-primary tabular-nums">
                    {r.winChance}%
                 </td>
                 <td className="px-2 py-3 text-center">
@@ -348,11 +348,11 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                   <span
                     className={`inline-block rounded-md px-2 py-1 font-display text-[11px] font-bold ${
                   r.outcome === "WIN"
-                    ? "bg-emerald-500 text-background"
+                    ? "bg-primary text-primary-foreground"
                     : r.outcome === "LOSS"
                       ? "bg-primary text-primary-foreground"
                       : r.outcome === "MISSING"
-                        ? "bg-slate-600 text-white"
+                        ? "bg-surface-2 text-foreground"
                         : "bg-pending text-pending-foreground"
                     }`}
                   >

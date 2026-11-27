@@ -86,23 +86,21 @@ export function TelegramGate({ children }: { children: (user: TgUser) => ReactNo
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-5">
-        <div className="w-full max-w-sm rounded-2xl border border-gold/40 bg-surface p-7 text-center shadow-[0_0_40px_-14px_var(--gold)]">
+        <div className="w-full max-w-sm rounded-2xl border border-primary/30 bg-surface p-7 text-center shadow-[0_0_40px_-14px_rgba(255,85,0,0.3)]">
           <img
-            src="https://i.ibb.co/TDnRFdGw/IMG-20260730-162018-470.jpg"
-            alt="Dr Thet Pyinn VIP Signals logo"
-            className="mx-auto h-20 w-20 rounded-full border border-gold object-cover"
+            src="https://i.ibb.co/Q1wQmwH/Gemini-Generated-Image-f2xya3f2xya3f2xy.jpg"
+            alt="AutoYield logo"
+            className="mx-auto h-20 w-20 rounded-full border border-primary object-cover"
           />
-          <h1 className="mt-4 font-display text-xl font-bold">
-            Dr Thet Pyinn <span className="text-gold">VIP</span> Signals
-          </h1>
+          <h1 className="mt-4 font-display text-xl font-bold">AutoYield</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            VIP signals ကြည့်ရန် Telegram account ဖြင့် ဝင်ရောက်ပါ။
+            VIP signals and auto play အတွက် Telegram account ဖြင့် ဝင်ရောက်ပါ။
           </p>
           <a
             href="https://t.me/formula_1_si"
             className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-3 font-display text-sm font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Open in Telegram
+            OPEN IN TELEGRAM
           </a>
           <p className="mt-4 text-xs text-muted-foreground">
             ဒီ site ကို Telegram Mini App ထဲမှာဖွင့်ပါက အလိုအလျောက် login ဝင်ပါမည်။

@@ -6,18 +6,18 @@ import { AdminPanel } from "@/components/AdminPanel";
 
 import { VipLocked, VipWelcome } from "@/components/VipNotice";
 
-const LOGO = "https://i.ibb.co/ZRwKk7rf/IMG-20260730-162018-470.jpg";
+const LOGO = "https://i.ibb.co/Q1wQmwH/Gemini-Generated-Image-f2xya3f2xya3f2xy.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dr Thet Pyinn VIP Signals — Live Signals & Results" },
+      { title: "AutoYield — Live Signals & Results" },
       {
         name: "description",
         content:
-          "Live results, current period, countdown timer and VIP signals from Dr Thet Pyinn VIP Signals.",
+          "Live results, current period, countdown timer and VIP signals from AutoYield.",
       },
-      { property: "og:title", content: "Dr Thet Pyinn VIP Signals" },
+      { property: "og:title", content: "AutoYield" },
       {
         property: "og:description",
         content: "Live period, countdown, VIP signals and game history feed.",
@@ -47,8 +47,7 @@ function colorDots(color: string) {
 
 function dotClass(c: string) {
   if (c === "red") return "bg-primary";
-  if (c === "green") return "bg-emerald-500";
-  if (c === "violet") return "bg-violet-500";
+  if (c === "green" || c === "violet") return "bg-primary";
   return "bg-muted-foreground";
 }
 
@@ -242,16 +241,16 @@ function Dashboard({ user }: { user: TgUser }) {
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <img
             src={LOGO}
-            alt="Dr Thet Pyinn VIP Signals logo"
-            className="h-11 w-11 rounded-full border border-gold object-cover"
+            alt="AutoYield logo"
+            className="h-11 w-11 rounded-full border border-primary object-cover"
             loading="eager"
           />
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-display text-lg font-bold tracking-wide">
-              Dr Thet Pyinn <span className="text-gold">VIP</span> Signals
+              AutoYield
             </h1>
           </div>
-          <span className="flex max-w-[40%] items-center gap-2 rounded-full border border-gold/40 px-2 py-1 text-xs text-muted-foreground">
+          <span className="flex max-w-[40%] items-center gap-2 rounded-full border border-primary/30 px-2 py-1 text-xs text-muted-foreground">
             {user.photo_url ? (
               <img
                 src={user.photo_url}
@@ -269,7 +268,7 @@ function Dashboard({ user }: { user: TgUser }) {
       </header>
 
       <div className="mx-auto max-w-3xl px-4 py-5">
-        <section className="mb-5 rounded-xl border border-gold/40 bg-surface p-5 shadow-[0_0_30px_-12px_var(--gold)]">
+        <section className="mb-5 rounded-xl border border-primary/30 bg-surface p-5 shadow-[0_0_30px_-12px_rgba(255,85,0,0.3)]">
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0">
               <p className="font-display text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -285,7 +284,7 @@ function Dashboard({ user }: { user: TgUser }) {
               </p>
               <p className="font-display text-4xl font-black tabular-nums text-primary">
                 {mm}
-                <span className="text-gold">:</span>
+                <span className="text-primary">:</span>
                 {ss}
               </p>
             </div>
@@ -307,7 +306,7 @@ function Dashboard({ user }: { user: TgUser }) {
               <SignalsPanel historyRows={list} liveResults={list} />
             ) : (
               <section>
-                <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-gold">
+                <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-primary">
                   Game History
                 </h2>
                 <div className="overflow-hidden rounded-xl border border-border">
@@ -384,7 +383,7 @@ function Dashboard({ user }: { user: TgUser }) {
         )}
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          © Dr Thet Pyinn VIP Signals
+          © AutoYield
         </p>
       </div>
 
@@ -395,7 +394,7 @@ function Dashboard({ user }: { user: TgUser }) {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`flex flex-1 flex-col items-center gap-1 py-3 transition-colors ${
-                tab === t.id ? "text-gold" : "text-muted-foreground"
+                tab === t.id ? "text-primary" : "text-muted-foreground"
               }`}
             >
               <svg
