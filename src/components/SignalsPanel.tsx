@@ -15,14 +15,21 @@ type Signal = {
   postedAt: string | null;
   winChance?: number | null;
 };
-type ResultRow = { issueNumber: string; number: string; blockTimestamp: number };
-type HistoryRow = { issueNumber: string; number: string; blockTimestamp: number };
+type ResultRow = { issueNumber: string; number: string; size?: Direction | null; blockTimestamp: number };
+type HistoryRow = {
+  issueNumber: string;
+  issue_number?: string;
+  period?: string;
+  number: string;
+  size?: Direction | null;
+  blockTimestamp: number;
+};
 
 function dirOf(num: string): Direction {
   return Number.parseInt(num, 10) >= 5 ? "BIG" : "SMALL";
 }
 
-function deterministicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string }>): number {
+function deterministicWinChance(signal: Signal, index: number, rows: Array<{ outcome: string | null }>): number {
   const digits = String(signal.period ?? "").replace(/\D/g, "");
   const roundSeed = Number.parseInt(digits.slice(-4) || digits || "0", 10);
   const baseChance = 60 + (roundSeed % 9);
@@ -47,7 +54,6 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [signalType, setSignalType] = useState<"trx" | "trade-x">("trx");
   const [isLoading, setIsLoading] = useState(true);
   const hasCompletedInitialLoad = useRef(false);
   const requestSequence = useRef(0);
@@ -114,11 +120,11 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const gameHistory = liveRows.length > 0
         ? liveRows
         : [...directHistory, ...publicHistory, ...snapshotHistory];
-      const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : null;
+      const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : [];
       const directRows = directSignalsResponse.data ?? [];
-      const signalRows = apiRows ?? directRows;
+      const signalRows = [...apiRows, ...directRows];
       const uniquePeriods = new Set<string>();
-      let list: Signal[] = signalRows
+      let list: Signal[] = signalRows.length > 0
         ? signalRows.map((row: Record<string, unknown>, index: number) => {
             const direction = String(row.website_direction ?? row.direction ?? row.prediction ?? row.signal ?? "").toUpperCase();
             const normalizedDirection = direction === "B" || direction === "BIG" ? "BIG" : "SMALL";
@@ -126,7 +132,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               signalId: String(row.signal_id ?? row.id ?? `signal-${index}`),
               period: String(row.period ?? row.transaction_no ?? row.transaction_number ?? ""),
               sourceDirection: String(row.source_direction ?? normalizedDirection).toUpperCase() as Direction,
-              direction: (apiRows ? normalizedDirection : normalizedDirection === "BIG" ? "SMALL" : "BIG") as Direction,
+              direction: normalizedDirection as Direction,
               level: Number(row.level ?? row.step ?? 1),
               sourceText: String(row.source_text ?? ""),
               postedAt: String(row.posted_at ?? row.created_at ?? ""),
@@ -155,6 +161,10 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
           number: String(
             row.result_number ?? row.number ?? row.result ?? row.winNumber ?? row.win_number ?? "",
           ).trim(),
+          size: (() => {
+            const value = String(row["size"] ?? row["result_size"] ?? row["big_small"] ?? "").toUpperCase();
+            return value === "BIG" || value === "B" ? "BIG" : value === "SMALL" || value === "S" ? "SMALL" : null;
+          })(),
           blockTimestamp: timestampMs(
             row.block_timestamp ??
               row.block_time ??
@@ -238,58 +248,55 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
   }, []);
 
-  const rows = signals.map((signal) => {
+  const rows = signals.map((signal, signalIndex) => {
     const signalNo = String(signal.period ?? "").trim().replace(/\D/g, "");
     const latestIssue = results[0]?.issueNumber?.replace(/\D/g, "") ?? "";
     const activePrefix = latestIssue.slice(0, Math.max(0, latestIssue.length - 2));
     const round = signalNo.slice(-2).padStart(2, "0");
-    const latestRound = latestIssue.slice(-2).padStart(2, "0");
-    const roundNumber = Number(round);
-    const latestRoundNumber = Number(latestRound);
-    const isUpcomingRound = latestIssue && (
-      roundNumber === latestRoundNumber + 1 ||
-      (latestRoundNumber === 99 && roundNumber === 0)
+    const upcomingIssue = latestIssue ? String(BigInt(latestIssue) + 1n) : "";
+    const isUpcomingRound = Boolean(
+      upcomingIssue && (signalNo === upcomingIssue || (signalNo.length <= 2 && upcomingIssue.endsWith(round))),
     );
-    const upcomingIssue = isUpcomingRound ? String(BigInt(latestIssue) + 1n) : "";
     const matched = results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       return Boolean(historyNo && signalNo && historyNo === signalNo);
-    }) ?? results.find((result) => {
+    }) ?? (signalNo.length <= 2 ? results.find((result) => {
       const historyNo = String(result.issueNumber ?? "").trim().replace(/\D/g, "");
       return Boolean(historyNo && round && historyNo.endsWith(round));
-    });
+    }) : undefined);
     const num = matched?.number;
-    const actual = num == null ? null : dirOf(num);
+    const actual = matched?.size ?? (num == null || num === "" ? null : dirOf(num));
     const prediction = String(signal.direction ?? "").toUpperCase();
-    const signalPostedAt = Date.parse(signal.postedAt);
-    const latestSettledAt = results[0]?.blockTimestamp ?? 0;
-    const secondsIntoPeriod = signalPostedAt > latestSettledAt
-      ? (signalPostedAt - latestSettledAt) / 1000
-      : 0;
-    const arrivedTooLate = Boolean(
-      signalPostedAt && latestSettledAt && secondsIntoPeriod >= 55 && secondsIntoPeriod <= 90,
-    );
-    const outcome = arrivedTooLate
-      ? "MISSING"
-      : matched && num != null && num !== ""
-        ? actual === prediction ? "WIN" : "LOSS"
-        : "PENDING";
+    const isCurrentRound = isUpcomingRound || (results.length === 0 && signalIndex === 0);
+    const outcome = actual
+      ? actual === prediction ? "WIN" : "LOSS"
+      : isCurrentRound ? "PENDING" : null;
     // The channel posts only the short tail (for example TRX 91). Rebuild the
     // full transaction number from the result feed: the matched issue when the
     // round has settled, otherwise the current day's prefix plus the tail.
     const displaySuffix = round;
     const fallbackPeriod = signalNo || (latestIssue ? String(BigInt(latestIssue) + 1n) : String(Date.now()));
     const derivedPeriod = activePrefix && round ? `${activePrefix}${displaySuffix}` : fallbackPeriod;
-    const fullPeriod = matched?.issueNumber ?? upcomingIssue ?? derivedPeriod;
+    const fullPeriod = matched?.issueNumber ?? (isCurrentRound ? upcomingIssue : derivedPeriod);
     return { ...signal, num, outcome, fullPeriod };
   });
 
-  const withChance = rows.map((row, index) => ({
-    ...row,
-    winChance: deterministicWinChance(row, index, rows),
-  }));
+  const withChance = rows
+    .map((row, index) => ({
+      ...row,
+      winChance: deterministicWinChance(row, index, rows),
+    }))
+    .sort((a, b) => {
+      try {
+        const first = BigInt(a.fullPeriod || "0");
+        const second = BigInt(b.fullPeriod || "0");
+        return first === second ? 0 : first > second ? -1 : 1;
+      } catch {
+        return Date.parse(b.postedAt ?? "") - Date.parse(a.postedAt ?? "");
+      }
+    });
 
-  const displayRows = withChance.slice(0, 10);
+  const displayRows = withChance.filter((row) => row.outcome !== null).slice(0, 15);
   const latest = withChance[0];
 
   return (
@@ -297,8 +304,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-primary">VIP Signals</h2>
         <div className="flex rounded-lg border border-primary/30 bg-surface p-1 text-[10px] font-bold uppercase tracking-wider">
-          <button type="button" onClick={() => setSignalType("trx")} className={`rounded px-2 py-1 ${signalType === "trx" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>TRX signals</button>
-          <button type="button" disabled className="cursor-not-allowed rounded px-2 py-1 text-muted-foreground opacity-60" title="TRADE X signals are not available yet">TRADE X signals · Locked</button>
+          <span aria-current="page" className="rounded bg-primary px-2 py-1 text-primary-foreground">TRX signals</span>
         </div>
       </div>
 
@@ -372,13 +378,13 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                   <span
                     className={`inline-block rounded-md border px-2 py-1 font-display text-[11px] font-bold ${
                       r.outcome === "WIN"
-                        ? "border-white/40 bg-white/10 text-[#FFFFFF]"
+                        ? "border-white/40 bg-white/10 text-white"
                         : r.outcome === "LOSS"
                           ? "border-[#FF5500]/50 bg-[#FF5500]/15 text-[#FF5500]"
                           : "border-white/20 bg-transparent text-white/60"
                     }`}
                   >
-                    {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" && r.outcome !== "MISSING" ? `(${r.num})` : ""}
+                    {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" ? `(${r.num})` : ""}
                   </span>
                 </td>
               </tr>
