@@ -301,9 +301,11 @@ function Dashboard({ user }: { user: TgUser }) {
           <VipLocked onClaim={claimDailyFree} claimMessage={claimMessage} />
         ) : (
           <>
-            <VipWelcome expiresAt={access.expiresAt} />
             {tab === "signals" ? (
-              <SignalsPanel historyRows={list} liveResults={list} />
+              <>
+                <VipWelcome expiresAt={access.expiresAt} />
+                <SignalsPanel historyRows={list} liveResults={list} />
+              </>
             ) : (
               <section>
                 <h2 className="mb-3 font-display text-sm font-bold uppercase tracking-[0.2em] text-primary">
