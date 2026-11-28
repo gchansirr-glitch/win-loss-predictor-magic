@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { TelegramGate, type TgUser } from "@/components/TelegramGate";
 import { SignalsPanel } from "@/components/SignalsPanel";
+import { AutoPlayPanel } from "@/components/AutoPlayPanel";
 import { AdminPanel } from "@/components/AdminPanel";
 
 import { VipLocked, VipWelcome } from "@/components/VipNotice";
@@ -39,7 +40,7 @@ type Item = {
   blockTimestamp: number;
 };
 
-type Tab = "signals" | "history" | "admin";
+type Tab = "signals" | "autoPlay" | "history" | "admin";
 
 function colorDots(color: string) {
   return color.split(",").map((c) => c.trim());
@@ -228,6 +229,7 @@ function Dashboard({ user }: { user: TgUser }) {
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "signals", label: "Signals", icon: "M3 17l6-6 4 4 8-8" },
+    { id: "autoPlay", label: "Auto Play", icon: "M7 4v16l13-8-13-8z" },
     { id: "history", label: "History", icon: "M4 6h16M4 12h16M4 18h10" },
     
     ...(isAdmin
@@ -301,7 +303,9 @@ function Dashboard({ user }: { user: TgUser }) {
           <VipLocked onClaim={claimDailyFree} claimMessage={claimMessage} />
         ) : (
           <>
-            {tab === "signals" ? (
+            {tab === "autoPlay" ? (
+              <AutoPlayPanel />
+            ) : tab === "signals" ? (
               <>
                 <VipWelcome expiresAt={access.expiresAt} />
                 <SignalsPanel historyRows={list} liveResults={list} />
