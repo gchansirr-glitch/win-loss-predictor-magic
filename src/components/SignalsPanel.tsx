@@ -16,6 +16,13 @@ type Signal = {
   winChance?: number | null;
 };
 type ResultRow = { issueNumber: string; number: string; size?: Direction | null; blockTimestamp: number };
+type PredictionResult = "PENDING" | "WIN" | "LOSS";
+type StoredPrediction = {
+  period: string;
+  winChance: number;
+  signal: Direction;
+  result: PredictionResult;
+};
 type HistoryRow = {
   issueNumber: string;
   issue_number?: string;
@@ -36,7 +43,7 @@ function deterministicWinChance(signal: Signal, index: number, rows: Array<{ out
 
   let consecutiveLosses = 0;
   for (let i = index + 1; i < rows.length; i += 1) {
-    if (rows[i].outcome !== "LOSS") break;
+    if (rows[i]?.outcome !== "LOSS") break;
     consecutiveLosses += 1;
   }
 
@@ -50,14 +57,63 @@ function timestampMs(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const PREDICTION_HISTORY_KEY = "autoyield.signal-history.v1";
+
+function readPredictionHistory(): StoredPrediction[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PREDICTION_HISTORY_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is StoredPrediction =>
+        typeof item?.period === "string" &&
+        typeof item?.winChance === "number" &&
+        (item?.signal === "BIG" || item?.signal === "SMALL") &&
+        (item?.result === "PENDING" || item?.result === "WIN" || item?.result === "LOSS"),
+      )
+      .slice(0, 15);
+  } catch {
+    return [];
+  }
+}
+
+function normalizePeriod(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function periodNumber(value: string): bigint | null {
+  if (!/^\\d+$/.test(value)) return null;
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
 export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRows?: HistoryRow[]; liveResults?: HistoryRow[] }) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [results, setResults] = useState<ResultRow[]>([]);
+  const [predictionHistory, setPredictionHistory] = useState<StoredPrediction[]>([]);
+  const [hasLoadedPredictionHistory, setHasLoadedPredictionHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const hasCompletedInitialLoad = useRef(false);
   const requestSequence = useRef(0);
   const isLoadingData = useRef(false);
+
+  useEffect(() => {
+    setPredictionHistory(readPredictionHistory());
+    setHasLoadedPredictionHistory(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPredictionHistory) return;
+    try {
+      window.localStorage.setItem(PREDICTION_HISTORY_KEY, JSON.stringify(predictionHistory.slice(0, 15)));
+    } catch {
+      // Keep the in-memory history available when browser storage is unavailable.
+    }
+  }, [hasLoadedPredictionHistory, predictionHistory]);
 
   useEffect(() => {
     let alive = true;
@@ -296,8 +352,73 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       }
     });
 
-  const displayRows = withChance.filter((row) => row.outcome !== null).slice(0, 15);
+  const activePeriod = results[0]
+    ? (() => {
+        const completedPeriod = periodNumber(normalizePeriod(results[0].issueNumber));
+        return completedPeriod === null ? "" : String(completedPeriod + 1n);
+      })()
+    : normalizePeriod(withChance[0]?.fullPeriod ?? withChance[0]?.period ?? "");
+  const latestCompleted = results.find((result) => Boolean(result.size || /^\\d$/.test(result.number)));
+  const displayRows = predictionHistory;
   const latest = withChance[0];
+
+  useEffect(() => {
+    if (!hasLoadedPredictionHistory || (withChance.length === 0 && results.length === 0)) return;
+
+    const merged = new Map<string, StoredPrediction>();
+    predictionHistory.forEach((prediction) => {
+      const period = normalizePeriod(prediction.period);
+      if (period) merged.set(period, { ...prediction, period });
+    });
+    withChance.forEach((row) => {
+      const period = normalizePeriod(row.fullPeriod || row.period);
+      if (!period) return;
+      const previous = merged.get(period);
+      merged.set(period, {
+        period,
+        winChance: row.winChance,
+        signal: row.direction,
+        result: previous?.result ?? "PENDING",
+      });
+    });
+
+    const latestOutcome = latestCompleted
+      ? latestCompleted.size ?? dirOf(latestCompleted.number)
+      : null;
+    const resolved = [...merged.values()].map((prediction) => {
+      if (activePeriod && prediction.period === activePeriod) {
+        return { ...prediction, result: "PENDING" as const };
+      }
+
+      const matched = results.find((result) => {
+        const resultPeriod = normalizePeriod(result.issueNumber);
+        return resultPeriod === prediction.period ||
+          (prediction.period.length <= 2 && resultPeriod.endsWith(prediction.period.padStart(2, "0")));
+      });
+      const matchedOutcome = matched
+        ? matched.size ?? (/^\\d$/.test(matched.number) ? dirOf(matched.number) : null)
+        : null;
+      if (matchedOutcome) {
+        return { ...prediction, result: matchedOutcome === prediction.signal ? "WIN" as const : "LOSS" as const };
+      }
+
+      const predictionPeriod = periodNumber(prediction.period);
+      const currentPeriod = periodNumber(activePeriod);
+      if (latestOutcome && predictionPeriod !== null && currentPeriod !== null && predictionPeriod < currentPeriod) {
+        return { ...prediction, result: latestOutcome === prediction.signal ? "WIN" as const : "LOSS" as const };
+      }
+      return prediction;
+    });
+
+    resolved.sort((a, b) => {
+      const first = periodNumber(a.period);
+      const second = periodNumber(b.period);
+      if (first === null || second === null) return 0;
+      return first === second ? 0 : first > second ? -1 : 1;
+    });
+    const next = resolved.slice(0, 15);
+    setPredictionHistory((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+  }, [activePeriod, hasLoadedPredictionHistory, latestCompleted, predictionHistory, results, withChance]);
 
   return (
     <section>
@@ -357,9 +478,9 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               </tr>
             )}
               {displayRows.map((r) => (
-               <tr key={r.signalId} className="border-t border-border bg-surface">
+               <tr key={r.period} className="border-t border-border bg-surface">
                 <td className="px-2 py-3 font-mono text-[11px] tabular-nums text-[#FFFFFF]">
-                  {r.fullPeriod || r.period || "—"}
+                  {r.period || "—"}
                 </td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-primary tabular-nums">
                    {r.winChance}%
@@ -367,8 +488,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 <td className="px-2 py-3 text-center">
                   <span className="inline-flex flex-col items-center gap-1">
                     <img
-                       src={r.direction === "BIG" ? BIG_IMG : SMALL_IMG}
-                       alt={r.direction}
+                       src={r.signal === "BIG" ? BIG_IMG : SMALL_IMG}
+                       alt={r.signal}
                       className="h-7 w-11 rounded object-cover"
                       loading="lazy"
                     />
@@ -377,14 +498,14 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 <td className="whitespace-nowrap px-2 py-3 text-right">
                   <span
                     className={`inline-block rounded-md border px-2 py-1 font-display text-[11px] font-bold ${
-                      r.outcome === "WIN"
-                        ? "border-white/40 bg-white/10 text-white"
-                        : r.outcome === "LOSS"
-                          ? "border-[#FF5500]/50 bg-[#FF5500]/15 text-[#FF5500]"
+                      r.result === "WIN"
+                        ? "border-white/40 bg-white/10 text-[#FFFFFF] font-bold"
+                        : r.result === "LOSS"
+                          ? "border-[#FF5500]/50 bg-[#FF5500]/15 text-[#FF5500] font-bold"
                           : "border-white/20 bg-transparent text-white/60"
                     }`}
                   >
-                    {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" ? `(${r.num})` : ""}
+                    {r.result}
                   </span>
                 </td>
               </tr>
