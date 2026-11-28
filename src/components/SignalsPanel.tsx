@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const BIG_IMG = "https://i.ibb.co/TM6j75MY/file-00000000cadc81fa82560b83392af859.png";
-const SMALL_IMG = "https://i.ibb.co/KzKMFjGZ/file-000000002a8881faa2dbc928498411ad.png";
+const BIG_IMG = "/images/signal-big.jpg";
+const SMALL_IMG = "/images/signal-small.jpg";
 
 type Direction = "BIG" | "SMALL";
 type Signal = {
