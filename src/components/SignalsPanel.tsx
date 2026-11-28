@@ -51,6 +51,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
   const [isLoading, setIsLoading] = useState(true);
   const hasCompletedInitialLoad = useRef(false);
   const requestSequence = useRef(0);
+  const isLoadingData = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -69,6 +70,8 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
     };
 
     const load = async () => {
+      if (isLoadingData.current) return;
+      isLoadingData.current = true;
       const requestId = ++requestSequence.current;
       const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
@@ -89,6 +92,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       const directSignalsResponse = await withTimeout(
         supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
       ).catch(() => ({ data: [], error: null }));
+      isLoadingData.current = false;
       if (!alive || requestId !== requestSequence.current) return;
       setIsLoading(false);
 
@@ -139,9 +143,25 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
 
       const historyResults: ResultRow[] = gameHistory
         .map((row: Record<string, unknown>) => ({
-          issueNumber: String(row.issue_number ?? row.issueNumber ?? row.transaction_no ?? row.period ?? "").trim(),
-          number: String(row.result_number ?? row.number ?? row.result ?? "").trim(),
-          blockTimestamp: timestampMs(row.block_timestamp ?? row.block_time ?? row.created_at),
+          issueNumber: String(
+            row.issue_number ??
+              row.issueNumber ??
+              row.transaction_no ??
+              row.transaction_number ??
+              row.issue ??
+              row.period ??
+              "",
+          ).trim(),
+          number: String(
+            row.result_number ?? row.number ?? row.result ?? row.winNumber ?? row.win_number ?? "",
+          ).trim(),
+          blockTimestamp: timestampMs(
+            row.block_timestamp ??
+              row.block_time ??
+              row.blockTimestamp ??
+              row.timestamp ??
+              row.created_at,
+          ),
         }))
         .filter((row: ResultRow) => /^\d+$/.test(row.issueNumber) && /^\d$/.test(row.number));
       const byIssue = new Map<string, ResultRow>();
@@ -210,7 +230,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
         winChance: 65,
       }]);
     }, 2000);
-    const id = setInterval(load, 750);
+    const id = setInterval(load, 5000);
     return () => {
       alive = false;
       clearTimeout(failsafe);
@@ -294,7 +314,9 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
               <p className="font-display text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 Transaction no
               </p>
-               <p className="truncate font-display text-base font-bold tabular-nums">{latest.fullPeriod}</p>
+              <p className="truncate font-mono text-base font-bold tabular-nums text-[#FFFFFF]">
+                {latest.fullPeriod || latest.period || "—"}
+              </p>
                <p className="mt-1 text-[11px] font-bold text-primary">
                  Win chance: {latest.winChance}%
                </p>
@@ -330,7 +352,9 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
             )}
               {displayRows.map((r) => (
                <tr key={r.signalId} className="border-t border-border bg-surface">
-                <td className="px-2 py-3 font-display text-[11px] tabular-nums">{r.fullPeriod}</td>
+                <td className="px-2 py-3 font-mono text-[11px] tabular-nums text-[#FFFFFF]">
+                  {r.fullPeriod || r.period || "—"}
+                </td>
                  <td className="px-2 py-3 text-center font-display text-xs font-bold text-primary tabular-nums">
                    {r.winChance}%
                 </td>
@@ -346,17 +370,15 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
                 </td>
                 <td className="whitespace-nowrap px-2 py-3 text-right">
                   <span
-                    className={`inline-block rounded-md px-2 py-1 font-display text-[11px] font-bold ${
-                  r.outcome === "WIN"
-                    ? "bg-primary text-primary-foreground"
-                    : r.outcome === "LOSS"
-                      ? "bg-primary text-primary-foreground"
-                      : r.outcome === "MISSING"
-                        ? "bg-surface-2 text-foreground"
-                        : "bg-pending text-pending-foreground"
+                    className={`inline-block rounded-md border px-2 py-1 font-display text-[11px] font-bold ${
+                      r.outcome === "WIN"
+                        ? "border-white/40 bg-white/10 text-[#FFFFFF]"
+                        : r.outcome === "LOSS"
+                          ? "border-[#FF5500]/50 bg-[#FF5500]/15 text-[#FF5500]"
+                          : "border-white/20 bg-transparent text-white/60"
                     }`}
                   >
-                     {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" && r.outcome !== "MISSING" ? `(${r.num})` : ""}
+                    {r.outcome ?? "PENDING"} {r.num != null && r.num !== "" && r.outcome !== "MISSING" ? `(${r.num})` : ""}
                   </span>
                 </td>
               </tr>
