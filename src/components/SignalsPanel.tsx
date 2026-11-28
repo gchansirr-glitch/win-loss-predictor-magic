@@ -117,7 +117,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
 
   useEffect(() => {
     let alive = true;
-    const withTimeout = async <T,>(promise: Promise<T>, ms = 3000): Promise<T> => {
+    const withTimeout = async <T,>(promise: PromiseLike<T>, ms = 3000): Promise<T> => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return await Promise.race([
@@ -135,7 +135,7 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
       if (isLoadingData.current) return;
       isLoadingData.current = true;
       const requestId = ++requestSequence.current;
-      const [signalsApiResponse, liveResultsResponse, historyResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
+      const [signalsApiResponse, liveResultsResponse, resultsApiResponse, snapshotsResponse] = await Promise.allSettled([
         withTimeout(fetch(`/api/public/signals?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`signals ${response.status}`);
           return response.json();
@@ -144,15 +144,16 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
           if (!response.ok) throw new Error(`live results ${response.status}`);
           return response.json();
         })),
-        withTimeout(supabase.from("game_history").select("*").order("created_at", { ascending: false }).limit(100)),
         withTimeout(fetch(`/api/public/results?t=${Date.now()}`, { cache: "no-store" }).then(async (response) => {
           if (!response.ok) throw new Error(`results ${response.status}`);
           return response.json();
         })),
         withTimeout(supabase.from("result_snapshots").select("*").order("issue_number", { ascending: false }).limit(50)),
       ]);
-      const directSignalsResponse = await withTimeout(
-        supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
+      const directSignalsResponse = await Promise.resolve(
+        withTimeout(
+          supabase.from("signal_snapshots").select("*").order("captured_at", { ascending: false }).limit(20),
+        ),
       ).catch(() => ({ data: [], error: null }));
       isLoadingData.current = false;
       if (!alive || requestId !== requestSequence.current) return;
@@ -160,22 +161,18 @@ export function SignalsPanel({ historyRows = [], liveResults = [] }: { historyRo
 
       const apiPayload = signalsApiResponse.status === "fulfilled" ? signalsApiResponse.value : null;
       const livePayload = liveResultsResponse.status === "fulfilled" ? liveResultsResponse.value : null;
-      const historyPayload = historyResponse.status === "fulfilled" ? historyResponse.value : null;
       const resultsPayload = resultsApiResponse.status === "fulfilled" ? resultsApiResponse.value : null;
       const liveRows = Array.isArray(livePayload?.data?.list)
         ? livePayload.data.list
         : Array.isArray(livePayload?.list) ? livePayload.list : [];
       const snapshotsPayload = snapshotsResponse.status === "fulfilled" ? snapshotsResponse.value : null;
-      const directHistory = historyPayload && "data" in historyPayload && Array.isArray(historyPayload.data)
-        ? historyPayload.data
-        : [];
       const publicHistory = Array.isArray(resultsPayload?.data?.list) ? resultsPayload.data.list : [];
       const snapshotHistory = snapshotsPayload && "data" in snapshotsPayload && Array.isArray(snapshotsPayload.data)
         ? snapshotsPayload.data
         : [];
       const gameHistory = liveRows.length > 0
         ? liveRows
-        : [...directHistory, ...publicHistory, ...snapshotHistory];
+        : [...publicHistory, ...snapshotHistory];
       const apiRows = Array.isArray(apiPayload?.list) ? apiPayload.list : [];
       const directRows = directSignalsResponse.data ?? [];
       const signalRows = [...apiRows, ...directRows];
