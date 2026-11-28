@@ -1,7 +1,7 @@
 "use client";
 
 const LOCK_IMG = "https://i.ibb.co/M0d0b90/file-00000000761c820b8ab63dbcb68674f8.png";
-const WELCOME_IMG = "https://ibb.co/DfYXjpk0";
+const WELCOME_IMG = "/images/welcome-vip.jpg";
 
 const OWNER_TG = "5471930058";
 
